@@ -127,18 +127,36 @@ function snapItemPosition(
   return { x: bestX, y: bestY };
 }
 
+export type PlacementResult =
+  | {
+      fits: true;
+      x: number;
+      y: number;
+      displaced: { id: string; x: number; y: number }[];
+      unplaced: string[];
+    }
+  | { fits: false };
+
 // Places `footprint` at its snapped position and, if that lands on top of
 // existing items, bumps them (and anything they in turn bump into) to the
 // nearest clear spot instead of redirecting the dragged item elsewhere.
-// Bounded pass count: in a genuinely packed room this is best-effort, same
-// spirit as the rest of this file's collision handling.
+// Bounded pass count: in a genuinely packed room this is best-effort — any
+// item that still can't be resolved after the cascade settles is reported
+// in `unplaced` rather than left overlapping, so the caller can send it back
+// to the tray instead of quietly accepting a collision. If the incoming
+// footprint doesn't fit inside the room at all (regardless of what else is
+// in it), the placement is rejected outright (`fits: false`).
 export function resolvePlacement(
   footprint: Footprint,
   proposedX: number,
   proposedY: number,
   room: { width_cm: number; depth_cm: number },
   others: PlacedItem[],
-): { x: number; y: number; displaced: { id: string; x: number; y: number }[] } {
+): PlacementResult {
+  if (footprint.w > room.width_cm || footprint.d > room.depth_cm) {
+    return { fits: false };
+  }
+
   const { x, y } = snapItemPosition(footprint, proposedX, proposedY, room, others);
   const draggedRect: PlacedRect = { x, y, w: footprint.w, d: footprint.d };
 
@@ -189,10 +207,25 @@ export function resolvePlacement(
     }
   }
 
-  const displaced = [...moved].map((id) => {
-    const rect = rectFor(id);
-    return { id, x: rect.x, y: rect.y };
-  });
+  // Final check: anything still overlapping something else once the cascade
+  // has settled (or run out of passes) couldn't actually be resolved —
+  // report it separately so the caller can unplace it rather than leave it
+  // sitting on top of another item.
+  const unplaced: string[] = [];
+  for (const [id, rect] of working) {
+    const stillOverlapping =
+      rectsOverlap(rect, draggedRect) ||
+      [...working].some(([otherId, otherRect]) => otherId !== id && rectsOverlap(rect, otherRect));
+    if (stillOverlapping) unplaced.push(id);
+  }
 
-  return { x, y, displaced };
+  const unplacedSet = new Set(unplaced);
+  const displaced = [...moved]
+    .filter((id) => !unplacedSet.has(id))
+    .map((id) => {
+      const rect = rectFor(id);
+      return { id, x: rect.x, y: rect.y };
+    });
+
+  return { fits: true, x, y, displaced, unplaced };
 }

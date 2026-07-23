@@ -13,6 +13,7 @@ import { DragGhost } from "@/components/hizzel/drag-ghost";
 import { useCurrentMove } from "@/hooks/use-current-move";
 import { useGroupedThings, useSendToTray, type ThingItem } from "@/hooks/use-things";
 import { useMoveItems, usePlaceItem } from "@/hooks/use-move-items";
+import { useFlashStore } from "@/hooks/use-flash-store";
 import { rotatedFootprint, resolvePlacement } from "@/lib/item-snap";
 import type { ThingCategory } from "@/lib/supabase/types";
 
@@ -149,23 +150,47 @@ export function ThingsWorld({ widthPx }: { widthPx: number }) {
           { width_cm: widthCm, depth_cm: depthCm },
           others,
         );
-        placeItem.mutate({
-          thingId: thing.id,
-          roomId,
-          x_cm: placed.x,
-          y_cm: placed.y,
-          rotation_deg: draggedItem.rotation_deg,
-        });
-        for (const bumped of placed.displaced) {
-          const bumpedItem = roomItems.find((i) => i.id === bumped.id);
-          if (!bumpedItem) continue;
+        if (!placed.fits) {
+          // Too big for this room outright — reject, back to the tray.
           placeItem.mutate({
-            thingId: bumped.id,
-            roomId,
-            x_cm: bumped.x,
-            y_cm: bumped.y,
-            rotation_deg: bumpedItem.rotation_deg,
+            thingId: thing.id,
+            roomId: null,
+            x_cm: null,
+            y_cm: null,
+            rotation_deg: draggedItem.rotation_deg,
           });
+          useFlashStore.getState().flash(thing.id);
+        } else {
+          placeItem.mutate({
+            thingId: thing.id,
+            roomId,
+            x_cm: placed.x,
+            y_cm: placed.y,
+            rotation_deg: draggedItem.rotation_deg,
+          });
+          for (const bumped of placed.displaced) {
+            const bumpedItem = roomItems.find((i) => i.id === bumped.id);
+            if (!bumpedItem) continue;
+            placeItem.mutate({
+              thingId: bumped.id,
+              roomId,
+              x_cm: bumped.x,
+              y_cm: bumped.y,
+              rotation_deg: bumpedItem.rotation_deg,
+            });
+          }
+          for (const unplacedId of placed.unplaced) {
+            const bumpedItem = roomItems.find((i) => i.id === unplacedId);
+            if (!bumpedItem) continue;
+            placeItem.mutate({
+              thingId: unplacedId,
+              roomId: null,
+              x_cm: null,
+              y_cm: null,
+              rotation_deg: bumpedItem.rotation_deg,
+            });
+            useFlashStore.getState().flash(unplacedId);
+          }
         }
       }
       // Dropped somewhere that isn't a room: no-op, card stays put.
@@ -244,7 +269,7 @@ export function ThingsWorld({ widthPx }: { widthPx: number }) {
             <div className="pt-2.5 pb-2 text-[10px] font-medium tracking-[0.1em] text-linen-ink-tertiary uppercase lg:text-xs">
               {group.roomName}
             </div>
-            <div className="mb-1 grid grid-cols-5 gap-1.5 lg:grid-cols-4 lg:gap-2.5">
+            <div className="mb-1 grid grid-cols-[repeat(auto-fill,minmax(64px,64px))] gap-1.5 lg:grid-cols-4 lg:gap-2.5">
               {group.items.map((item) => (
                 <ItemCard
                   key={item.id}
@@ -294,12 +319,19 @@ export function ThingsWorld({ widthPx }: { widthPx: number }) {
 }
 
 // Ghost sizing while cross-world dragging: use the room under the pointer's
-// exact scale once hovering one, otherwise a reasonable fallback so the
-// ghost still reads as a sensible size before a valid target is found.
+// exact scale once hovering one. Every room shares the same uniform
+// px-per-cm (computeCanvasScale fits the whole floorplan to the viewport),
+// so even before the pointer reaches a room, fall back to any room already
+// on screen rather than a guessed constant — a fixed number here is
+// typically several times the real canvas scale and renders a wildly
+// oversized ghost for the entire time the drag is still over the Things
+// side. Only guess a fallback if no room is on screen at all (empty
+// apartment), which can't be a valid drop target anyway.
 function hoveredRoomPxPerCm(clientX: number, clientY: number): number {
   if (typeof document === "undefined") return 3;
   const el = document.elementFromPoint(clientX, clientY);
-  const roomEl = el?.closest("[data-room-id]") as HTMLElement | null;
+  const hoveredRoomEl = el?.closest("[data-room-id]") as HTMLElement | null;
+  const roomEl = hoveredRoomEl ?? document.querySelector<HTMLElement>("[data-room-id]");
   if (roomEl) {
     const widthCm = Number(roomEl.dataset.widthCm);
     if (widthCm > 0) {

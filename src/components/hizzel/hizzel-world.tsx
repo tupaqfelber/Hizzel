@@ -14,6 +14,7 @@ import { useCurrentMove } from "@/hooks/use-current-move";
 import { useAreas, useUpdateArea } from "@/hooks/use-areas";
 import { useRooms, useUpdateRoomPosition } from "@/hooks/use-rooms";
 import { useMoveItems, usePlaceItem } from "@/hooks/use-move-items";
+import { useFlashStore } from "@/hooks/use-flash-store";
 import { computeCanvasScale } from "@/lib/canvas-scale";
 import { rotatedFootprint, resolvePlacement } from "@/lib/item-snap";
 import { RoomBlock } from "@/components/hizzel/room-block";
@@ -145,23 +146,47 @@ export function HizzelWorld({ widthPx }: { widthPx: number }) {
           });
 
         const placed = resolvePlacement({ w, d }, targetX, targetY, room, others);
-        placeItem.mutate({
-          thingId: itemId,
-          roomId: room.id,
-          x_cm: placed.x,
-          y_cm: placed.y,
-          rotation_deg: draggedItem.rotation_deg,
-        });
-        for (const bumped of placed.displaced) {
-          const bumpedItem = roomItems.find((i) => i.id === bumped.id);
-          if (!bumpedItem) continue;
+        if (!placed.fits) {
+          // Too big for this room outright — reject, back to the tray.
           placeItem.mutate({
-            thingId: bumped.id,
-            roomId: room.id,
-            x_cm: bumped.x,
-            y_cm: bumped.y,
-            rotation_deg: bumpedItem.rotation_deg,
+            thingId: itemId,
+            roomId: null,
+            x_cm: null,
+            y_cm: null,
+            rotation_deg: draggedItem.rotation_deg,
           });
+          useFlashStore.getState().flash(itemId);
+        } else {
+          placeItem.mutate({
+            thingId: itemId,
+            roomId: room.id,
+            x_cm: placed.x,
+            y_cm: placed.y,
+            rotation_deg: draggedItem.rotation_deg,
+          });
+          for (const bumped of placed.displaced) {
+            const bumpedItem = roomItems.find((i) => i.id === bumped.id);
+            if (!bumpedItem) continue;
+            placeItem.mutate({
+              thingId: bumped.id,
+              roomId: room.id,
+              x_cm: bumped.x,
+              y_cm: bumped.y,
+              rotation_deg: bumpedItem.rotation_deg,
+            });
+          }
+          for (const unplacedId of placed.unplaced) {
+            const bumpedItem = roomItems.find((i) => i.id === unplacedId);
+            if (!bumpedItem) continue;
+            placeItem.mutate({
+              thingId: unplacedId,
+              roomId: null,
+              x_cm: null,
+              y_cm: null,
+              rotation_deg: bumpedItem.rotation_deg,
+            });
+            useFlashStore.getState().flash(unplacedId);
+          }
         }
       } else if (draggedItem.roomId) {
         placeItem.mutate({
@@ -196,6 +221,11 @@ export function HizzelWorld({ widthPx }: { widthPx: number }) {
         return { id: i.id, x: i.x_cm!, y: i.y_cm!, w: fp.w, d: fp.d };
       });
     const placed = resolvePlacement(newFootprint, item.x_cm, item.y_cm, room, others);
+    if (!placed.fits) {
+      // Rotated footprint doesn't fit the room at all — reject the
+      // rotation entirely; the item stays exactly as it was.
+      return;
+    }
     placeItem.mutate({
       thingId: itemId,
       roomId: item.roomId,
@@ -213,6 +243,18 @@ export function HizzelWorld({ widthPx }: { widthPx: number }) {
         y_cm: bumped.y,
         rotation_deg: bumpedItem.rotation_deg,
       });
+    }
+    for (const unplacedId of placed.unplaced) {
+      const bumpedItem = roomItems.find((i) => i.id === unplacedId);
+      if (!bumpedItem) continue;
+      placeItem.mutate({
+        thingId: unplacedId,
+        roomId: null,
+        x_cm: null,
+        y_cm: null,
+        rotation_deg: bumpedItem.rotation_deg,
+      });
+      useFlashStore.getState().flash(unplacedId);
     }
   }
 

@@ -53,7 +53,7 @@ export function ItemBlock({
             onRotate();
           }}
           onPointerDown={(e) => e.stopPropagation()}
-          className="absolute -top-3 -right-3 flex h-6 w-6 items-center justify-center rounded-full bg-linen text-linen-ink shadow"
+          className="absolute top-1/2 left-1/2 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-linen text-linen-ink shadow"
         >
           <IconRotate size={12} />
         </button>

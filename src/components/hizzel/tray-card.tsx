@@ -3,6 +3,7 @@
 import { CATEGORY_COLORS } from "@/lib/category-colors";
 import { CATEGORY_ICONS } from "@/lib/category-icons";
 import type { MoveItem } from "@/hooks/use-move-items";
+import { useFlashStore } from "@/hooks/use-flash-store";
 
 export function TrayCard({
   item,
@@ -15,6 +16,7 @@ export function TrayCard({
 }) {
   const Icon = CATEGORY_ICONS[item.category];
   const color = CATEGORY_COLORS[item.category];
+  const flashing = useFlashStore((s) => s.flashingIds.has(item.id));
 
   return (
     <div
@@ -25,7 +27,9 @@ export function TrayCard({
       }`}
     >
       <div
-        className="flex h-12 w-12 items-center justify-center rounded-[8px]"
+        className={`flex h-12 w-12 items-center justify-center rounded-[8px] ${
+          flashing ? "animate-item-flash" : ""
+        }`}
         style={{ backgroundColor: color.bold }}
       >
         <Icon size={18} className="text-white/85" />
