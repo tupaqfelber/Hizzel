@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* Type */
+  --font-sans: var(--font-dm-sans);
+  --font-serif: var(--font-dm-serif-display);
+  --font-display-italic: var(--font-playfair-display);
+
+  /* Linen world (Things, Login) */
+  --color-linen: #f5f2ec;
+  --color-linen-border: #d6d0c4;
+  --color-linen-ink: #2c2a25;
+  --color-linen-ink-secondary: #8a8378;
+  --color-linen-ink-tertiary: #a09890;
+  --color-linen-field: #eae7df;
+  --color-linen-card: #edeae2;
+
+  /* Dark world (Hizzel) */
+  --color-dark: #1e1c16;
+  --color-dark-border: #3a3630;
+  --color-dark-toggle-track: #2a2820;
+  --color-dark-toggle-bar: #1a1814;
+  --color-dark-ink: #f0ede6;
+  --color-dark-ink-secondary: #6a6460;
+  --color-dark-ink-tertiary: #7a7670;
+  --color-dark-tool-label: #b0ada6;
+
+  /* Amber world (Welcome, My Hizzel) — full-screen gradient background, not an accent */
+  --color-amber-1: #a87238;
+  --color-amber-2: #9a6630;
+  --color-amber-3: #8a5a28;
+  --color-amber-4: #7a4e20;
+  --color-amber-border: #6a4218;
+  --color-amber-ink: #f5eee1;
+
+  /* Radius tiers (normalized from mockup's hand-tuned 2-28px values) */
+  --radius-xs: 4px; /* floor-plan micro elements */
+  --radius-sm: 10px; /* cards, buttons, inputs */
+  --radius-md: 22px; /* pills, toggle bar, logo button */
+}
+
+body {
+  background: var(--color-linen);
+  color: var(--color-linen-ink);
+}
+
+/* Rise-and-settle entrance for centered panels (desktop form drawer, My Hizzel). */
+@keyframes panel-rise {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Desktop only — mobile sheets keep their existing slide-up-from-bottom feel. */
+@media (min-width: 1024px) {
+  .animate-panel-rise {
+    animation: panel-rise 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+/* Same entrance, but always-on — for panels (like My Hizzel) that are centered at every size. */
+.animate-panel-rise-always {
+  animation: panel-rise 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
