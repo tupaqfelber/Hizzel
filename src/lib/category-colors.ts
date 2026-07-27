@@ -13,3 +13,17 @@ export const CATEGORY_COLORS: Record<ThingCategory, { pastel: string; bold: stri
   Storage: { pastel: "#C0D6D0", bold: "#155A4E" },
   Tables: { pastel: "#C3D2DE", bold: "#14407A" },
 };
+
+// Every flash confirmation in the app (tray reject/return, successful
+// placement, toolbar select) uses the item's own category colour rather
+// than one universal tone — this converts a category's bold hex into the
+// translucent rgba the .animate-item-flash keyframe expects, fed in via
+// the --flash-color CSS custom property (a keyframe can't read a plain hex
+// + alpha directly).
+export function categoryFlashColor(category: ThingCategory): string {
+  const hex = CATEGORY_COLORS[category].bold;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, 0.65)`;
+}

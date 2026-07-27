@@ -10,6 +10,7 @@ export interface MoveItem {
   depth_cm: number;
   height_cm: number;
   photo_url: string | null;
+  notes: string | null;
   roomId: string | null;
   x_cm: number | null;
   y_cm: number | null;
@@ -26,7 +27,7 @@ export function useMoveItems(moveId: string | undefined) {
       const [thingsRes, placementsRes] = await Promise.all([
         supabase
           .from("things")
-          .select("id, name, category, width_cm, depth_cm, height_cm, photo_url")
+          .select("id, name, category, width_cm, depth_cm, height_cm, photo_url, notes")
           .order("name"),
         supabase
           .from("placements")

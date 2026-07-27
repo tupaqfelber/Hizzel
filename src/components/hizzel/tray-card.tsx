@@ -1,6 +1,6 @@
 "use client";
 
-import { CATEGORY_COLORS } from "@/lib/category-colors";
+import { CATEGORY_COLORS, categoryFlashColor } from "@/lib/category-colors";
 import { CATEGORY_ICONS } from "@/lib/category-icons";
 import type { MoveItem } from "@/hooks/use-move-items";
 import { useFlashStore } from "@/hooks/use-flash-store";
@@ -30,7 +30,12 @@ export function TrayCard({
         className={`flex h-12 w-12 items-center justify-center rounded-[8px] ${
           flashing ? "animate-item-flash" : ""
         }`}
-        style={{ backgroundColor: color.bold }}
+        style={
+          {
+            backgroundColor: color.bold,
+            "--flash-color": categoryFlashColor(item.category),
+          } as React.CSSProperties
+        }
       >
         <Icon size={18} className="text-white/85" />
       </div>

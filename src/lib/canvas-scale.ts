@@ -19,13 +19,14 @@ export interface CanvasScale {
   contentHeightPx: number;
 }
 
-const PADDING_PX = 32;
+const DEFAULT_PADDING_PX = 32;
 const DEFAULT_PX_PER_CM = 0.5; // used when there are no rooms yet
 
 export function computeCanvasScale(
   rooms: RoomBounds[],
   viewportWidth: number,
   viewportHeight: number,
+  paddingPx: number = DEFAULT_PADDING_PX,
 ): CanvasScale {
   if (rooms.length === 0 || viewportWidth <= 0 || viewportHeight <= 0) {
     return {
@@ -45,8 +46,8 @@ export function computeCanvasScale(
   const contentWidthCm = Math.max(maxXCm - minXCm, 1);
   const contentHeightCm = Math.max(maxYCm - minYCm, 1);
 
-  const availableWidth = Math.max(viewportWidth - PADDING_PX * 2, 1);
-  const availableHeight = Math.max(viewportHeight - PADDING_PX * 2, 1);
+  const availableWidth = Math.max(viewportWidth - paddingPx * 2, 1);
+  const availableHeight = Math.max(viewportHeight - paddingPx * 2, 1);
 
   const pxPerCm = Math.min(
     availableWidth / contentWidthCm,

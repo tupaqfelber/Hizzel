@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { DM_Serif_Display, Playfair_Display, DM_Sans } from "next/font/google";
 import { AppProviders } from "@/components/providers/app-providers";
 import "./globals.css";
@@ -25,6 +25,17 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Hizzel",
   description: "Your things. Your homes. Your moves, made simple.",
+};
+
+// No user-scalable pinch/double-tap-zoom — this is an app-like canvas with
+// its own gestures (drag, double-tap-to-jump); the browser's native zoom
+// would fight those, and double-tap-to-zoom was swallowing the second tap
+// of the double-tap-to-jump gesture entirely.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({

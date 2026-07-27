@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ThingsWorld } from "@/components/things/things-world";
 import { HizzelWorld } from "@/components/hizzel/hizzel-world";
+import { HizzelMidPanel } from "@/components/hizzel/hizzel-mid-panel";
 import { MyHizzelOverlay } from "@/components/my-hizzel/my-hizzel-overlay";
 import { useCurrentMove } from "@/hooks/use-current-move";
 
@@ -16,10 +17,6 @@ function nearestStop(position: number): 0 | 0.5 | 1 {
   if (position < 0.25) return 0;
   if (position < 0.75) return 0.5;
   return 1;
-}
-
-function clampStop(stop: number): 0 | 0.5 | 1 {
-  return Math.min(1, Math.max(0, stop)) as 0 | 0.5 | 1;
 }
 
 function easeOutCubic(t: number) {
@@ -81,7 +78,10 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" }) 
     const startX = e.clientX;
     const startPosition = position;
     const rect = e.currentTarget.getBoundingClientRect();
-    const tappedRight = startX > rect.left + rect.width / 2;
+    // Three equal-width tap targets, one per stop — a plain tap jumps
+    // straight to whichever segment was tapped.
+    const tappedThird = Math.min(2, Math.max(0, Math.floor((3 * (startX - rect.left)) / rect.width)));
+    const tappedStop = ([0, 0.5, 1] as const)[tappedThird];
     let moved = false;
 
     function handleMove(ev: PointerEvent) {
@@ -96,8 +96,7 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" }) 
       window.removeEventListener("pointerup", handleUp);
 
       if (!moved) {
-        // Tap: step one stop toward whichever half of the pill was tapped.
-        animateTo(clampStop(nearestStop(startPosition) + (tappedRight ? 0.5 : -0.5)));
+        animateTo(tappedStop);
         return;
       }
 
@@ -112,8 +111,13 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" }) 
 
   return (
     <div className="relative flex h-dvh w-dvw overflow-hidden">
-      <ThingsWorld widthPx={thingsWidthPx} />
-      <HizzelWorld widthPx={hizzelWidthPx} />
+      <ThingsWorld widthPx={thingsWidthPx} onJumpToHizzel={() => animateTo(1)} />
+      <HizzelWorld widthPx={hizzelWidthPx} mobileActive={stop === 1} />
+      <HizzelMidPanel
+        widthPx={hizzelWidthPx}
+        mobileActive={stop !== 1}
+        onExpand={() => animateTo(1)}
+      />
 
       {position > 0 && position < 1 && (
         <div
@@ -128,22 +132,30 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" }) 
       >
         <div
           className={`flex-1 rounded-full py-2 text-center font-display-italic text-sm transition-colors ${
-            stop === 0
-              ? "bg-white text-[#1A1814]"
-              : stop === 0.5
-                ? "bg-white/15 text-white/85"
-                : "text-white/35"
+            stop === 0 ? "bg-white text-[#1A1814]" : "text-white/35"
           }`}
         >
           Things
         </div>
         <div
+          className={`flex flex-1 items-center justify-center gap-1 rounded-full transition-colors ${
+            stop === 0.5 ? "bg-white/15" : ""
+          }`}
+        >
+          <div
+            className={`h-0 w-0 border-y-4 border-r-[6px] border-y-transparent ${
+              stop === 0.5 ? "border-r-white/80" : "border-r-white/30"
+            }`}
+          />
+          <div
+            className={`h-0 w-0 border-y-4 border-l-[6px] border-y-transparent ${
+              stop === 0.5 ? "border-l-white/80" : "border-l-white/30"
+            }`}
+          />
+        </div>
+        <div
           className={`flex-1 rounded-full py-2 text-center font-serif text-[13px] tracking-[0.05em] transition-colors ${
-            stop === 1
-              ? "bg-white text-[#1A1814]"
-              : stop === 0.5
-                ? "bg-white/15 text-white/85"
-                : "text-white/35"
+            stop === 1 ? "bg-white text-[#1A1814]" : "text-white/35"
           }`}
         >
           Hizzel

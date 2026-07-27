@@ -1,11 +1,14 @@
 import { create } from "zustand";
 
-// Brief highlight for items that just bounced back to the tray — a
-// rejected placement (didn't fit) or a bystander that couldn't be pushed
-// clear of a drop. Global rather than component state because the trigger
-// can come from either world (Hizzel's own in-canvas drag, or a
-// cross-world drag started from a Things card), while the tray itself is
-// only ever rendered by HizzelWorld.
+// Brief highlight for an item that just landed somewhere — a successful
+// placement into a room (confirmation) or a bounce back to the tray (a
+// rejected placement that didn't fit, or a bystander that couldn't be
+// pushed clear of a drop). Global rather than component state because the
+// trigger can come from any of the three placement routes (Hizzel's own
+// in-canvas drag, a cross-world drag from a Things card, or the Mid
+// panel's magical thumbnail drop), while the flashing element itself is
+// rendered by whichever component currently shows that item (tray card,
+// full-canvas item block, or Mid's thumbnail/unassigned-list rows).
 const FLASH_DURATION_MS = 700;
 
 interface FlashStore {

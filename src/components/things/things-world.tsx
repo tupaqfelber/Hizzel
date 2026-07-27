@@ -37,7 +37,13 @@ const CATEGORIES: ThingCategory[] = [
   "Tables",
 ];
 
-export function ThingsWorld({ widthPx }: { widthPx: number }) {
+export function ThingsWorld({
+  widthPx,
+  onJumpToHizzel,
+}: {
+  widthPx: number;
+  onJumpToHizzel: () => void;
+}) {
   const { data: move } = useCurrentMove();
   const { data } = useGroupedThings(move?.id);
   const sendToTray = useSendToTray(move?.id);
@@ -109,6 +115,13 @@ export function ThingsWorld({ widthPx }: { widthPx: number }) {
     function handleUp(ev: PointerEvent) {
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
+      // Captured before clearHover() nulls it out — handleMove has been
+      // tracking this continuously and reliably (it's what drives the
+      // hover outline), so it's a more trustworthy source for "which room
+      // is this drop over" than a single fresh elementFromPoint query
+      // exactly at the release instant, which real touch input can land
+      // a frame or a few pixels off from.
+      const lastHoveredRoomEl = hoveredRoomEl;
       clearHover();
 
       if (!moved) {
@@ -119,7 +132,17 @@ export function ThingsWorld({ widthPx }: { widthPx: number }) {
 
       const draggedItem = moveItems?.find((i) => i.id === thing.id);
       const el = document.elementFromPoint(ev.clientX, ev.clientY);
-      const roomEl = el?.closest("[data-room-id]") as HTMLElement | null;
+      const roomEl = (el?.closest("[data-room-id]") as HTMLElement | null) ?? lastHoveredRoomEl;
+      // The Mid panel's thumbnail rooms carry the same data-room-id the
+      // full canvas does, so a hit there is indistinguishable from a hit
+      // on the roomEl.closest() above. This just tells us whether we're
+      // inside the Mid drop zone at all, for the two cases below it: a
+      // successful thumbnail placement also jumps to full Hizzel (the
+      // thumbnail is too small to see the result on), and a drop that
+      // lands in the zone but misses every room still confirms the item
+      // as unassigned instead of silently doing nothing.
+      const inMidZone =
+        !!el?.closest("[data-hizzel-mid-zone]") || !!roomEl?.closest("[data-hizzel-mid-zone]");
 
       if (draggedItem && roomEl) {
         const roomId = roomEl.dataset.roomId!;
@@ -168,6 +191,8 @@ export function ThingsWorld({ widthPx }: { widthPx: number }) {
             y_cm: placed.y,
             rotation_deg: draggedItem.rotation_deg,
           });
+          useFlashStore.getState().flash(thing.id);
+          if (inMidZone) onJumpToHizzel();
           for (const bumped of placed.displaced) {
             const bumpedItem = roomItems.find((i) => i.id === bumped.id);
             if (!bumpedItem) continue;
@@ -192,8 +217,24 @@ export function ThingsWorld({ widthPx }: { widthPx: number }) {
             useFlashStore.getState().flash(unplacedId);
           }
         }
+      } else if (draggedItem && inMidZone) {
+        // Missed every room but still landed in the Mid panel (the
+        // thumbnail's gaps between rooms, or the drawer itself) — confirm
+        // it as unassigned rather than leaving the drop looking like it
+        // did nothing. It's already unassigned by default with no
+        // placement row, so this just re-affirms that and flashes it in
+        // the drawer list.
+        placeItem.mutate({
+          thingId: thing.id,
+          roomId: null,
+          x_cm: null,
+          y_cm: null,
+          rotation_deg: draggedItem.rotation_deg,
+        });
+        useFlashStore.getState().flash(thing.id);
       }
-      // Dropped somewhere that isn't a room: no-op, card stays put.
+      // Dropped somewhere else entirely (back in Things, or outside the
+      // app): no-op, card stays put.
 
       setCardDrag(null);
     }

@@ -9,12 +9,16 @@ import {
   IconLockOpen,
   IconSearch,
   IconChevronDown,
+  IconRotate,
+  IconPencil,
+  IconX,
 } from "@tabler/icons-react";
 import { useCurrentMove } from "@/hooks/use-current-move";
 import { useAreas, useUpdateArea } from "@/hooks/use-areas";
 import { useRooms, useUpdateRoomPosition } from "@/hooks/use-rooms";
 import { useMoveItems, usePlaceItem } from "@/hooks/use-move-items";
 import { useFlashStore } from "@/hooks/use-flash-store";
+import { categoryFlashColor } from "@/lib/category-colors";
 import { computeCanvasScale } from "@/lib/canvas-scale";
 import { rotatedFootprint, resolvePlacement } from "@/lib/item-snap";
 import { RoomBlock } from "@/components/hizzel/room-block";
@@ -25,6 +29,7 @@ import { MyHizzelOverlay } from "@/components/my-hizzel/my-hizzel-overlay";
 import { AreaDropdown } from "@/components/hizzel/area-dropdown";
 import { RoomFormSheet } from "@/components/hizzel/room-form-sheet";
 import { EditAreasSheet } from "@/components/hizzel/edit-areas-sheet";
+import { ThingFormSheet } from "@/components/things/thing-form-sheet";
 
 interface DragState {
   itemId: string;
@@ -32,7 +37,13 @@ interface DragState {
   clientY: number;
 }
 
-export function HizzelWorld({ widthPx }: { widthPx: number }) {
+export function HizzelWorld({
+  widthPx,
+  mobileActive,
+}: {
+  widthPx: number;
+  mobileActive: boolean;
+}) {
   const { data: move } = useCurrentMove();
   const newProperty = move?.properties.find((p) => p.role === "new");
 
@@ -43,6 +54,7 @@ export function HizzelWorld({ widthPx }: { widthPx: number }) {
   const [addRoomOpen, setAddRoomOpen] = useState(false);
   const [myHizzelOpen, setMyHizzelOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
 
   // Default to the first area once loaded, without a setState-in-effect.
@@ -57,6 +69,7 @@ export function HizzelWorld({ widthPx }: { widthPx: number }) {
   const updateRoomPosition = useUpdateRoomPosition(selectedAreaId);
   const { data: items } = useMoveItems(move?.id);
   const placeItem = usePlaceItem(move?.id);
+  const flashingIds = useFlashStore((s) => s.flashingIds);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
@@ -114,7 +127,14 @@ export function HizzelWorld({ widthPx }: { widthPx: number }) {
       window.removeEventListener("pointerup", handleUp);
 
       if (!moved) {
-        setSelectedItemId((curr) => (curr === itemId ? null : itemId));
+        setSelectedItemId((curr) => {
+          const next = curr === itemId ? null : itemId;
+          // Flash the toolbar's new content on select, not deselect — a
+          // packed room can make it unclear which item was actually hit,
+          // so this confirms the tap registered and which one it landed on.
+          if (next) useFlashStore.getState().flash(next);
+          return next;
+        });
         setDrag(null);
         return;
       }
@@ -164,6 +184,7 @@ export function HizzelWorld({ widthPx }: { widthPx: number }) {
             y_cm: placed.y,
             rotation_deg: draggedItem.rotation_deg,
           });
+          useFlashStore.getState().flash(itemId);
           for (const bumped of placed.displaced) {
             const bumpedItem = roomItems.find((i) => i.id === bumped.id);
             if (!bumpedItem) continue;
@@ -259,10 +280,12 @@ export function HizzelWorld({ widthPx }: { widthPx: number }) {
   }
 
   const draggedItem = drag ? items?.find((i) => i.id === drag.itemId) : undefined;
+  const selectedItem = selectedItemId ? items?.find((i) => i.id === selectedItemId) : undefined;
+  const selectedItemFlashing = selectedItemId ? flashingIds.has(selectedItemId) : false;
 
   return (
     <div
-      className={`relative flex h-dvh min-w-0 shrink-0 flex-col overflow-hidden bg-dark lg:!w-1/2 lg:h-full ${widthPx === 0 ? "max-lg:pointer-events-none" : ""}`}
+      className={`relative ${mobileActive ? "flex" : "hidden"} h-dvh min-w-0 shrink-0 flex-col overflow-hidden bg-dark lg:flex lg:!w-1/2 lg:h-full ${widthPx === 0 ? "max-lg:pointer-events-none" : ""}`}
       style={{ width: `${widthPx}px` }}
     >
       <div className="flex items-center gap-3 px-5 pt-3.5 pb-2.5 lg:items-start lg:justify-end lg:gap-3.5 lg:px-9 lg:pt-7 lg:pb-3.5">
@@ -333,11 +356,55 @@ export function HizzelWorld({ widthPx }: { widthPx: number }) {
         >
           {selectedArea?.is_locked ? <IconLock size={14} /> : <IconLockOpen size={14} />}
         </button>
+        {/* Right of the padlock on mobile (plain DOM order); the outer
+            row's lg:flex-row-reverse flips that to left-of-padlock on
+            desktop, with no reversal needed on this group's own children —
+            rotate, edit, name, close reads the same way on both. */}
+        {selectedItem && (
+          <div
+            className={`flex items-center gap-1 rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-2 py-[5px] ${
+              selectedItemFlashing ? "animate-item-flash" : ""
+            }`}
+            style={
+              selectedItemFlashing
+                ? ({ "--flash-color": categoryFlashColor(selectedItem.category) } as React.CSSProperties)
+                : undefined
+            }
+          >
+            <button
+              type="button"
+              onClick={() => handleRotate(selectedItem.id)}
+              aria-label="Rotate"
+              className="flex h-6 w-6 shrink-0 items-center justify-center text-dark-tool-label"
+            >
+              <IconRotate size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditingItemId(selectedItem.id)}
+              aria-label="Edit"
+              className="flex h-6 w-6 shrink-0 items-center justify-center text-dark-tool-label"
+            >
+              <IconPencil size={13} />
+            </button>
+            <span className="max-w-[88px] truncate text-[11px] font-medium whitespace-nowrap text-dark-tool-label lg:max-w-[160px]">
+              {selectedItem.name}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedItemId(null)}
+              aria-label="Deselect"
+              className="flex h-6 w-6 shrink-0 items-center justify-center text-dark-tool-label"
+            >
+              <IconX size={13} />
+            </button>
+          </div>
+        )}
         <div className="flex-1" />
         <button
           type="button"
           aria-label="Search"
-          className="flex h-9 w-10 shrink-0 items-center justify-center rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] text-dark-ink-secondary"
+          className={`${selectedItem ? "hidden lg:flex" : "flex"} h-9 w-10 shrink-0 items-center justify-center rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] text-dark-ink-secondary`}
         >
           <IconSearch size={16} />
         </button>
@@ -369,7 +436,6 @@ export function HizzelWorld({ widthPx }: { widthPx: number }) {
                   selected={selectedItemId === item.id}
                   dragging={drag?.itemId === item.id}
                   onPointerDown={(e) => startDrag(item.id, e)}
-                  onRotate={() => handleRotate(item.id)}
                 />
               ),
             )}
@@ -406,6 +472,13 @@ export function HizzelWorld({ widthPx }: { widthPx: number }) {
         <EditAreasSheet propertyId={newProperty.id} onClose={() => setEditAreasOpen(false)} />
       )}
       {myHizzelOpen && <MyHizzelOverlay onClose={() => setMyHizzelOpen(false)} />}
+      {editingItemId &&
+        (() => {
+          const editingItem = items?.find((i) => i.id === editingItemId);
+          return editingItem ? (
+            <ThingFormSheet thing={editingItem} onClose={() => setEditingItemId(null)} />
+          ) : null;
+        })()}
 
       {drag && draggedItem && (
         <DragGhost item={draggedItem} clientX={drag.clientX} clientY={drag.clientY} scale={scale} />

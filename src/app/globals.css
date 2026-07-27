@@ -68,15 +68,21 @@ body {
   animation: panel-rise 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Brief highlight on a tray item that just bounced back — a rejected
-   placement (didn't fit) or a bystander that couldn't be pushed clear. */
+/* Brief highlight on an item that just landed — a successful placement
+   (confirmation), a bounce back to the tray (rejected placement, or a
+   bystander that couldn't be pushed clear), or a toolbar selection
+   confirmation. Colour comes from --flash-color (each item's own category
+   bold tone, set inline per element) rather than one fixed colour — a
+   keyframe can't read a dynamic hex+alpha directly, so it's threaded
+   through as a custom property with the original amber as a fallback for
+   anywhere that forgets to set it. */
 @keyframes item-flash {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(168, 114, 56, 0);
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
   }
   35% {
-    box-shadow: 0 0 0 4px rgba(168, 114, 56, 0.65);
+    box-shadow: 0 0 0 4px var(--flash-color, rgba(168, 114, 56, 0.65));
   }
 }
 
