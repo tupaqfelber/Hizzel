@@ -13,6 +13,8 @@ import { rotatedFootprint } from "@/lib/item-snap";
 import { CATEGORY_COLORS, categoryFlashColor } from "@/lib/category-colors";
 import { CATEGORY_ICONS } from "@/lib/category-icons";
 import { RoomFormSheet } from "@/components/hizzel/room-form-sheet";
+import { FloorPlanReviewSheet } from "@/components/hizzel/floorplan-review-sheet";
+import { useExtractFloorPlan, type ExtractResponse } from "@/hooks/use-floorplan-import";
 
 // The Mid resting stop's right half: a miniature read-only preview of the
 // floor plan (tap = jump to full Hizzel, drop a Things card here = magical
@@ -38,6 +40,27 @@ export function HizzelMidPanel({
   const { data: items } = useMoveItems(move?.id);
   const flashingIds = useFlashStore((s) => s.flashingIds);
   const [addRoomOpen, setAddRoomOpen] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [reviewData, setReviewData] = useState<ExtractResponse | null>(null);
+  const planFileInputRef = useRef<HTMLInputElement>(null);
+  const extractFloorPlan = useExtractFloorPlan();
+
+  async function handlePlanFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setExtracting(true);
+    setUploadError(null);
+    try {
+      const result = await extractFloorPlan.mutateAsync(file);
+      setReviewData(result);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Couldn't read that file");
+    } finally {
+      setExtracting(false);
+    }
+  }
 
   const thumbRef = useRef<HTMLDivElement>(null);
   const [thumbSize, setThumbSize] = useState({ width: 0, height: 0 });
@@ -111,11 +134,29 @@ export function HizzelMidPanel({
           </button>
           <button
             type="button"
-            className="flex items-center gap-1 rounded-lg border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-[7px] py-[3px] text-[9px] font-medium text-dark-tool-label"
+            onClick={() => planFileInputRef.current?.click()}
+            disabled={extracting}
+            className="flex items-center gap-1 rounded-lg border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-[7px] py-[3px] text-[9px] font-medium text-dark-tool-label disabled:opacity-60"
           >
-            <IconUpload size={9} /> Plan
+            <IconUpload size={9} /> {extracting ? "Reading…" : "Plan"}
           </button>
+          <input
+            ref={planFileInputRef}
+            type="file"
+            accept="image/*,application/pdf"
+            className="hidden"
+            onChange={handlePlanFileSelected}
+          />
         </div>
+        {uploadError && (
+          <button
+            type="button"
+            onClick={() => setUploadError(null)}
+            className="mt-1.5 w-full rounded-lg bg-dark-ink/[.07] px-2.5 py-1.5 text-left text-[9px] text-dark-ink-tertiary"
+          >
+            {uploadError}
+          </button>
+        )}
         <div
           ref={thumbRef}
           onClick={onExpand}
@@ -215,6 +256,16 @@ export function HizzelMidPanel({
 
       {addRoomOpen && area && (
         <RoomFormSheet areaId={area.id} onClose={() => setAddRoomOpen(false)} />
+      )}
+      {reviewData && newProperty && (
+        <FloorPlanReviewSheet
+          propertyId={newProperty.id}
+          moveId={move?.id}
+          existingAreaId={area?.id}
+          existingRoomCount={rooms?.length}
+          extraction={reviewData}
+          onClose={() => setReviewData(null)}
+        />
       )}
     </div>
   );

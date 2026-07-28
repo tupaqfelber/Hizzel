@@ -30,6 +30,8 @@ import { AreaDropdown } from "@/components/hizzel/area-dropdown";
 import { RoomFormSheet } from "@/components/hizzel/room-form-sheet";
 import { EditAreasSheet } from "@/components/hizzel/edit-areas-sheet";
 import { ThingFormSheet } from "@/components/things/thing-form-sheet";
+import { FloorPlanReviewSheet } from "@/components/hizzel/floorplan-review-sheet";
+import { useExtractFloorPlan, type ExtractResponse } from "@/hooks/use-floorplan-import";
 
 interface DragState {
   itemId: string;
@@ -52,6 +54,11 @@ export function HizzelWorld({
   const [areaDropdownOpen, setAreaDropdownOpen] = useState(false);
   const [editAreasOpen, setEditAreasOpen] = useState(false);
   const [addRoomOpen, setAddRoomOpen] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [reviewData, setReviewData] = useState<ExtractResponse | null>(null);
+  const planFileInputRef = useRef<HTMLInputElement>(null);
+  const extractFloorPlan = useExtractFloorPlan();
   const [myHizzelOpen, setMyHizzelOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -283,6 +290,22 @@ export function HizzelWorld({
   const selectedItem = selectedItemId ? items?.find((i) => i.id === selectedItemId) : undefined;
   const selectedItemFlashing = selectedItemId ? flashingIds.has(selectedItemId) : false;
 
+  async function handlePlanFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+    setExtracting(true);
+    setUploadError(null);
+    try {
+      const result = await extractFloorPlan.mutateAsync(file);
+      setReviewData(result);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Couldn't read that file");
+    } finally {
+      setExtracting(false);
+    }
+  }
+
   return (
     <div
       className={`relative ${mobileActive ? "flex" : "hidden"} h-dvh min-w-0 shrink-0 flex-col overflow-hidden bg-dark lg:flex lg:!w-1/2 lg:h-full ${widthPx === 0 ? "max-lg:pointer-events-none" : ""}`}
@@ -341,10 +364,19 @@ export function HizzelWorld({
         </button>
         <button
           type="button"
-          className="flex items-center gap-1 rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-3.5 py-[7px] text-[11px] font-medium whitespace-nowrap text-dark-tool-label"
+          onClick={() => planFileInputRef.current?.click()}
+          disabled={extracting}
+          className="flex items-center gap-1 rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-3.5 py-[7px] text-[11px] font-medium whitespace-nowrap text-dark-tool-label disabled:opacity-60"
         >
-          <IconUpload size={12} /> Plan
+          <IconUpload size={12} /> {extracting ? "Reading…" : "Plan"}
         </button>
+        <input
+          ref={planFileInputRef}
+          type="file"
+          accept="image/*,application/pdf"
+          className="hidden"
+          onChange={handlePlanFileSelected}
+        />
         <button
           type="button"
           onClick={() =>
@@ -409,6 +441,16 @@ export function HizzelWorld({
           <IconSearch size={16} />
         </button>
       </div>
+
+      {uploadError && (
+        <button
+          type="button"
+          onClick={() => setUploadError(null)}
+          className="mx-5 mb-2 rounded-[10px] bg-dark-ink/[.07] px-3.5 py-2 text-left text-[11px] text-dark-ink-secondary"
+        >
+          {uploadError}
+        </button>
+      )}
 
       <div
         ref={canvasRef}
@@ -479,6 +521,16 @@ export function HizzelWorld({
             <ThingFormSheet thing={editingItem} onClose={() => setEditingItemId(null)} />
           ) : null;
         })()}
+      {reviewData && newProperty && (
+        <FloorPlanReviewSheet
+          propertyId={newProperty.id}
+          moveId={move?.id}
+          existingAreaId={selectedAreaId}
+          existingRoomCount={rooms?.length}
+          extraction={reviewData}
+          onClose={() => setReviewData(null)}
+        />
+      )}
 
       {drag && draggedItem && (
         <DragGhost item={draggedItem} clientX={drag.clientX} clientY={drag.clientY} scale={scale} />
