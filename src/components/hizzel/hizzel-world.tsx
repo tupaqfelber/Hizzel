@@ -17,12 +17,22 @@ import { useCurrentMove } from "@/hooks/use-current-move";
 import { useAreas, useUpdateArea } from "@/hooks/use-areas";
 import { useRooms, useUpdateRoomPosition, useUpdateRoom } from "@/hooks/use-rooms";
 import { useMoveItems, usePlaceItem } from "@/hooks/use-move-items";
+import {
+  useStructuralElements,
+  useCreateStructuralElement,
+  useUpdateStructuralElement,
+} from "@/hooks/use-structural-elements";
 import { useFlashStore } from "@/hooks/use-flash-store";
 import { categoryFlashColor } from "@/lib/category-colors";
 import { computeCanvasScale } from "@/lib/canvas-scale";
 import { rotatedFootprint, resolvePlacement } from "@/lib/item-snap";
+import { resolveWallDrop, STRUCTURAL_DEFAULT_WIDTH_CM } from "@/lib/wall-snap";
+import { STRUCTURAL_COLORS } from "@/lib/structural-colors";
 import { RoomBlock } from "@/components/hizzel/room-block";
 import { ItemBlock } from "@/components/hizzel/item-block";
+import { StructuralBlock } from "@/components/hizzel/structural-block";
+import { StructuralChip } from "@/components/hizzel/structural-chip";
+import { StructuralFormSheet } from "@/components/hizzel/structural-form-sheet";
 import { TrayCard } from "@/components/hizzel/tray-card";
 import { DragGhost } from "@/components/hizzel/drag-ghost";
 import { MyHizzelOverlay } from "@/components/my-hizzel/my-hizzel-overlay";
@@ -32,9 +42,16 @@ import { EditAreasSheet } from "@/components/hizzel/edit-areas-sheet";
 import { ThingFormSheet } from "@/components/things/thing-form-sheet";
 import { FloorPlanReviewSheet } from "@/components/hizzel/floorplan-review-sheet";
 import { useExtractFloorPlan, type ExtractResponse } from "@/hooks/use-floorplan-import";
+import type { StructuralType } from "@/lib/supabase/types";
 
 interface DragState {
   itemId: string;
+  clientX: number;
+  clientY: number;
+}
+
+interface StructuralDragState {
+  type: StructuralType;
   clientX: number;
   clientY: number;
 }
@@ -64,7 +81,10 @@ export function HizzelWorld({
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
+  const [selectedStructuralId, setSelectedStructuralId] = useState<string | null>(null);
+  const [editingStructuralId, setEditingStructuralId] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
+  const [structuralDrag, setStructuralDrag] = useState<StructuralDragState | null>(null);
 
   // Default to the first area once loaded, without a setState-in-effect.
   const selectedAreaId =
@@ -79,6 +99,9 @@ export function HizzelWorld({
   const updateRoom = useUpdateRoom();
   const { data: items } = useMoveItems(move?.id);
   const placeItem = usePlaceItem(move?.id);
+  const { data: structuralElements } = useStructuralElements(rooms?.map((r) => r.id));
+  const createStructuralElement = useCreateStructuralElement();
+  const updateStructuralElement = useUpdateStructuralElement();
   const flashingIds = useFlashStore((s) => s.flashingIds);
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -116,6 +139,54 @@ export function HizzelWorld({
       if (!itemsByRoom.has(item.roomId)) itemsByRoom.set(item.roomId, []);
       itemsByRoom.get(item.roomId)!.push(item);
     }
+  }
+
+  const elementsByRoom = new Map<string, NonNullable<typeof structuralElements>>();
+  for (const el of structuralElements ?? []) {
+    if (!elementsByRoom.has(el.room_id)) elementsByRoom.set(el.room_id, []);
+    elementsByRoom.get(el.room_id)!.push(el);
+  }
+
+  function startChipDrag(type: StructuralType, e: React.PointerEvent) {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    setStructuralDrag({ type, clientX: startX, clientY: startY });
+
+    function handleMove(ev: PointerEvent) {
+      setStructuralDrag((d) => (d ? { ...d, clientX: ev.clientX, clientY: ev.clientY } : d));
+    }
+
+    function handleUp(ev: PointerEvent) {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const roomEl = el?.closest("[data-room-id]") as HTMLElement | null;
+      const room = roomEl && rooms?.find((r) => r.id === roomEl.dataset.roomId);
+
+      if (roomEl && room) {
+        const roomRect = roomEl.getBoundingClientRect();
+        const localXcm = (ev.clientX - roomRect.left) / scale.pxPerCm;
+        const localYcm = (ev.clientY - roomRect.top) / scale.pxPerCm;
+        const width = STRUCTURAL_DEFAULT_WIDTH_CM[type];
+        const result = resolveWallDrop(width, localXcm, localYcm, room, elementsByRoom.get(room.id) ?? []);
+        if (result.fits) {
+          createStructuralElement.mutate({
+            room_id: room.id,
+            type,
+            wall_side: result.wall_side,
+            offset_cm: result.offset_cm,
+            width_cm: width,
+          });
+        }
+      }
+
+      setStructuralDrag(null);
+    }
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
   }
 
   function startDrag(itemId: string, e: React.PointerEvent) {
@@ -305,7 +376,10 @@ export function HizzelWorld({
   const selectedItem = selectedItemId ? items?.find((i) => i.id === selectedItemId) : undefined;
   const selectedItemFlashing = selectedItemId ? flashingIds.has(selectedItemId) : false;
   const selectedRoom = selectedRoomId ? rooms?.find((r) => r.id === selectedRoomId) : undefined;
-  const hasSelection = !!selectedItem || !!selectedRoom;
+  const selectedStructural = selectedStructuralId
+    ? structuralElements?.find((e) => e.id === selectedStructuralId)
+    : undefined;
+  const hasSelection = !!selectedItem || !!selectedRoom || !!selectedStructural;
 
   async function handlePlanFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -430,22 +504,25 @@ export function HizzelWorld({
                 : undefined
             }
           >
-            <button
-              type="button"
-              onClick={() => {
-                if (selectedItem) handleRotate(selectedItem.id);
-                else if (selectedRoom) handleRotateRoom(selectedRoom.id);
-              }}
-              aria-label="Rotate"
-              className="flex h-6 w-6 shrink-0 items-center justify-center text-dark-tool-label"
-            >
-              <IconRotate size={13} />
-            </button>
+            {!selectedStructural && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedItem) handleRotate(selectedItem.id);
+                  else if (selectedRoom) handleRotateRoom(selectedRoom.id);
+                }}
+                aria-label="Rotate"
+                className="flex h-6 w-6 shrink-0 items-center justify-center text-dark-tool-label"
+              >
+                <IconRotate size={13} />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
                 if (selectedItem) setEditingItemId(selectedItem.id);
                 else if (selectedRoom) setEditingRoomId(selectedRoom.id);
+                else if (selectedStructural) setEditingStructuralId(selectedStructural.id);
               }}
               aria-label="Edit"
               className="flex h-6 w-6 shrink-0 items-center justify-center text-dark-tool-label"
@@ -453,13 +530,14 @@ export function HizzelWorld({
               <IconPencil size={13} />
             </button>
             <span className="max-w-[88px] truncate text-[11px] font-medium whitespace-nowrap text-dark-tool-label lg:max-w-[160px]">
-              {selectedItem?.name ?? selectedRoom?.name}
+              {selectedItem?.name ?? selectedRoom?.name ?? (selectedStructural?.type === "door" ? "Door" : "Window")}
             </span>
             <button
               type="button"
               onClick={() => {
                 setSelectedItemId(null);
                 setSelectedRoomId(null);
+                setSelectedStructuralId(null);
               }}
               aria-label="Deselect"
               className="flex h-6 w-6 shrink-0 items-center justify-center text-dark-tool-label"
@@ -493,6 +571,7 @@ export function HizzelWorld({
         onClick={() => {
           setSelectedItemId(null);
           setSelectedRoomId(null);
+          setSelectedStructuralId(null);
         }}
         className="relative flex-1 overflow-hidden"
       >
@@ -511,6 +590,7 @@ export function HizzelWorld({
             onSelect={() => {
               setSelectedRoomId(room.id);
               setSelectedItemId(null);
+              setSelectedStructuralId(null);
             }}
           >
             {(itemsByRoom.get(room.id) ?? []).map((item) =>
@@ -525,6 +605,24 @@ export function HizzelWorld({
                 />
               ),
             )}
+            {(elementsByRoom.get(room.id) ?? []).map((el) => (
+              <StructuralBlock
+                key={el.id}
+                element={el}
+                room={room}
+                scale={scale}
+                otherElements={(elementsByRoom.get(room.id) ?? []).filter((o) => o.id !== el.id)}
+                selected={selectedStructuralId === el.id}
+                onSelect={() => {
+                  setSelectedStructuralId(el.id);
+                  setSelectedItemId(null);
+                  setSelectedRoomId(null);
+                }}
+                onDragEnd={(wallSide, offsetCm) =>
+                  updateStructuralElement.mutate({ id: el.id, wall_side: wallSide, offset_cm: offsetCm })
+                }
+              />
+            ))}
           </RoomBlock>
         ))}
         {rooms?.length === 0 && (
@@ -532,6 +630,19 @@ export function HizzelWorld({
             Add a room or upload a plan
           </p>
         )}
+      </div>
+
+      <div className="flex shrink-0 gap-3 px-4 pt-2 [scrollbar-width:none] lg:pl-24">
+        <StructuralChip
+          type="door"
+          dragging={structuralDrag?.type === "door"}
+          onPointerDown={(e) => startChipDrag("door", e)}
+        />
+        <StructuralChip
+          type="window"
+          dragging={structuralDrag?.type === "window"}
+          onPointerDown={(e) => startChipDrag("window", e)}
+        />
       </div>
 
       {trayItems.length > 0 && (
@@ -579,6 +690,20 @@ export function HizzelWorld({
             />
           ) : null;
         })()}
+      {editingStructuralId &&
+        (() => {
+          const el = structuralElements?.find((e) => e.id === editingStructuralId);
+          const elRoom = el && rooms?.find((r) => r.id === el.room_id);
+          if (!el || !elRoom) return null;
+          return (
+            <StructuralFormSheet
+              element={el}
+              room={elRoom}
+              otherElements={(elementsByRoom.get(el.room_id) ?? []).filter((o) => o.id !== el.id)}
+              onClose={() => setEditingStructuralId(null)}
+            />
+          );
+        })()}
       {reviewData && newProperty && (
         <FloorPlanReviewSheet
           propertyId={newProperty.id}
@@ -591,6 +716,18 @@ export function HizzelWorld({
 
       {drag && draggedItem && (
         <DragGhost item={draggedItem} clientX={drag.clientX} clientY={drag.clientY} scale={scale} />
+      )}
+      {structuralDrag && (
+        <div
+          className="pointer-events-none fixed z-[60] -translate-x-1/2 -translate-y-1/2 rounded-[1px] opacity-70"
+          style={{
+            left: structuralDrag.clientX,
+            top: structuralDrag.clientY,
+            width: Math.max(STRUCTURAL_DEFAULT_WIDTH_CM[structuralDrag.type] * scale.pxPerCm, 24),
+            height: 6,
+            backgroundColor: STRUCTURAL_COLORS[structuralDrag.type],
+          }}
+        />
       )}
     </div>
   );

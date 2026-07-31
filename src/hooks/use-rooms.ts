@@ -91,7 +91,9 @@ export function useUpdateRoom() {
 }
 
 // Deleting a room returns anything placed in it to the tray for free —
-// placements.room_id is `references rooms(id) on delete set null`.
+// placements.room_id is `references rooms(id) on delete set null`. Its
+// structural_elements (doors/windows) aren't so lucky — that FK cascades,
+// so the cached structural-elements query needs an explicit invalidate too.
 export function useDeleteRoom(areaId: string | undefined, moveId: string | undefined) {
   const supabase = createClient();
   const queryClient = useQueryClient();
@@ -104,6 +106,7 @@ export function useDeleteRoom(areaId: string | undefined, moveId: string | undef
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rooms", areaId] });
       queryClient.invalidateQueries({ queryKey: ["move-items", moveId] });
+      queryClient.invalidateQueries({ queryKey: ["structural-elements"] });
     },
   });
 }
