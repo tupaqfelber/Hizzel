@@ -32,6 +32,25 @@ function wallLength(wallSide: WallSide, room: { width_cm: number; depth_cm: numb
   return wallSide === "n" || wallSide === "s" ? room.width_cm : room.depth_cm;
 }
 
+// Every wall, nearest first, from a point clamped into the room — shared by
+// the live preview (no fit check) and the commit path (which walks this list
+// trying each wall until one actually fits).
+function wallsByDistance(
+  localXcm: number,
+  localYcm: number,
+  room: { width_cm: number; depth_cm: number },
+): { wall_side: WallSide; along: number }[] {
+  const x = Math.min(Math.max(localXcm, 0), room.width_cm);
+  const y = Math.min(Math.max(localYcm, 0), room.depth_cm);
+
+  return [
+    { wall_side: "n" as WallSide, dist: y, along: x },
+    { wall_side: "s" as WallSide, dist: room.depth_cm - y, along: x },
+    { wall_side: "w" as WallSide, dist: x, along: y },
+    { wall_side: "e" as WallSide, dist: room.width_cm - x, along: y },
+  ].sort((a, b) => a.dist - b.dist);
+}
+
 function segmentsOverlap(aStart: number, aWidth: number, bStart: number, bWidth: number) {
   return (
     aStart < bStart + bWidth - OVERLAP_EPSILON_CM && aStart + aWidth > bStart + OVERLAP_EPSILON_CM
@@ -79,10 +98,11 @@ export function resolveWallPlacement(
   return { fits: true, wall_side: wallSide, offset_cm: bestOffset };
 }
 
-// Drop-point based (chip drag or an existing element's own reposition drag).
-// Clamps the point into the room, picks whichever of the 4 walls is nearest
-// by perpendicular distance, centers the element under the point along that
-// wall's axis, then delegates to resolveWallPlacement.
+// Drop-point based (chip drag or an existing element's own reposition-drag
+// commit). Tries the nearest wall first, then falls through the other 3 in
+// increasing distance order before giving up — a drop rarely needs to be
+// pixel-perfect on the "right" wall to land somewhere reasonable, matching
+// "give it a larger area to aim for."
 export function resolveWallDrop(
   elementWidth: number,
   localXcm: number,
@@ -90,19 +110,33 @@ export function resolveWallDrop(
   room: { width_cm: number; depth_cm: number },
   others: PlacedStructural[],
 ): WallSnapResult {
-  const x = Math.min(Math.max(localXcm, 0), room.width_cm);
-  const y = Math.min(Math.max(localYcm, 0), room.depth_cm);
+  for (const wall of wallsByDistance(localXcm, localYcm, room)) {
+    const result = resolveWallPlacement(
+      elementWidth,
+      wall.wall_side,
+      wall.along - elementWidth / 2,
+      room,
+      others,
+    );
+    if (result.fits) return result;
+  }
+  return { fits: false };
+}
 
-  const distances: { wall_side: WallSide; dist: number }[] = [
-    { wall_side: "n", dist: y },
-    { wall_side: "s", dist: room.depth_cm - y },
-    { wall_side: "w", dist: x },
-    { wall_side: "e", dist: room.width_cm - x },
-  ];
-  const nearest = distances.reduce((a, b) => (b.dist < a.dist ? b : a));
-
-  const along = nearest.wall_side === "n" || nearest.wall_side === "s" ? x : y;
-  const proposedOffset = along - elementWidth / 2;
-
-  return resolveWallPlacement(elementWidth, nearest.wall_side, proposedOffset, room, others);
+// Unvalidated nearest-wall position for live drag feedback — no overlap
+// check, always returns *something* so the dragged bar can track the
+// pointer smoothly every frame instead of freezing whenever the current
+// point doesn't happen to be a valid final resting spot. Only
+// resolveWallDrop's result should ever be persisted.
+export function previewWallPosition(
+  elementWidth: number,
+  localXcm: number,
+  localYcm: number,
+  room: { width_cm: number; depth_cm: number },
+): { wall_side: WallSide; offset_cm: number } {
+  const [nearest] = wallsByDistance(localXcm, localYcm, room);
+  const length = wallLength(nearest.wall_side, room);
+  const maxOffset = Math.max(length - elementWidth, 0);
+  const offset_cm = Math.min(Math.max(nearest.along - elementWidth / 2, 0), maxOffset);
+  return { wall_side: nearest.wall_side, offset_cm };
 }

@@ -27,7 +27,7 @@ import { categoryFlashColor } from "@/lib/category-colors";
 import { computeCanvasScale } from "@/lib/canvas-scale";
 import { rotatedFootprint, resolvePlacement } from "@/lib/item-snap";
 import { resolveWallDrop, STRUCTURAL_DEFAULT_WIDTH_CM } from "@/lib/wall-snap";
-import { STRUCTURAL_COLORS } from "@/lib/structural-colors";
+import { STRUCTURAL_COLORS, structuralFlashColor } from "@/lib/structural-colors";
 import { RoomBlock } from "@/components/hizzel/room-block";
 import { ItemBlock } from "@/components/hizzel/item-block";
 import { StructuralBlock } from "@/components/hizzel/structural-block";
@@ -374,12 +374,21 @@ export function HizzelWorld({
 
   const draggedItem = drag ? items?.find((i) => i.id === drag.itemId) : undefined;
   const selectedItem = selectedItemId ? items?.find((i) => i.id === selectedItemId) : undefined;
-  const selectedItemFlashing = selectedItemId ? flashingIds.has(selectedItemId) : false;
   const selectedRoom = selectedRoomId ? rooms?.find((r) => r.id === selectedRoomId) : undefined;
   const selectedStructural = selectedStructuralId
     ? structuralElements?.find((e) => e.id === selectedStructuralId)
     : undefined;
   const hasSelection = !!selectedItem || !!selectedRoom || !!selectedStructural;
+  const selectedFlashing = !!(
+    (selectedItemId && flashingIds.has(selectedItemId)) ||
+    (selectedRoomId && flashingIds.has(selectedRoomId)) ||
+    (selectedStructuralId && flashingIds.has(selectedStructuralId))
+  );
+  const selectedFlashColor = selectedItem
+    ? categoryFlashColor(selectedItem.category)
+    : selectedStructural
+      ? structuralFlashColor(selectedStructural.type)
+      : "rgba(220, 215, 205, 0.55)";
 
   async function handlePlanFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -496,11 +505,11 @@ export function HizzelWorld({
         {hasSelection && (
           <div
             className={`flex items-center gap-1 rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-2 py-[5px] ${
-              selectedItemFlashing ? "animate-item-flash" : ""
+              selectedFlashing ? "animate-item-flash" : ""
             }`}
             style={
-              selectedItemFlashing && selectedItem
-                ? ({ "--flash-color": categoryFlashColor(selectedItem.category) } as React.CSSProperties)
+              selectedFlashing
+                ? ({ "--flash-color": selectedFlashColor } as React.CSSProperties)
                 : undefined
             }
           >
@@ -591,6 +600,7 @@ export function HizzelWorld({
               setSelectedRoomId(room.id);
               setSelectedItemId(null);
               setSelectedStructuralId(null);
+              useFlashStore.getState().flash(room.id);
             }}
           >
             {(itemsByRoom.get(room.id) ?? []).map((item) =>
@@ -617,6 +627,7 @@ export function HizzelWorld({
                   setSelectedStructuralId(el.id);
                   setSelectedItemId(null);
                   setSelectedRoomId(null);
+                  useFlashStore.getState().flash(el.id);
                 }}
                 onDragEnd={(wallSide, offsetCm) =>
                   updateStructuralElement.mutate({ id: el.id, wall_side: wallSide, offset_cm: offsetCm })
@@ -632,7 +643,15 @@ export function HizzelWorld({
         )}
       </div>
 
-      <div className="flex shrink-0 gap-3 px-4 pt-2 [scrollbar-width:none] lg:pl-24">
+      <div className="flex shrink-0 gap-3 overflow-x-auto px-4 py-3 [scrollbar-width:none] lg:pl-24">
+        {trayItems.map((item) => (
+          <TrayCard
+            key={item.id}
+            item={item}
+            dragging={drag?.itemId === item.id}
+            onPointerDown={(e) => startDrag(item.id, e)}
+          />
+        ))}
         <StructuralChip
           type="door"
           dragging={structuralDrag?.type === "door"}
@@ -644,19 +663,6 @@ export function HizzelWorld({
           onPointerDown={(e) => startChipDrag("window", e)}
         />
       </div>
-
-      {trayItems.length > 0 && (
-        <div className="flex shrink-0 gap-3 overflow-x-auto px-4 py-3 [scrollbar-width:none] lg:pl-24">
-          {trayItems.map((item) => (
-            <TrayCard
-              key={item.id}
-              item={item}
-              dragging={drag?.itemId === item.id}
-              onPointerDown={(e) => startDrag(item.id, e)}
-            />
-          ))}
-        </div>
-      )}
 
       {/* Reserves space for the shared bottom toggle bar, now rendered by
           AppShell as a fixed overlay spanning both worlds. */}

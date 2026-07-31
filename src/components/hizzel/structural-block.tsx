@@ -4,7 +4,7 @@ import { useRef } from "react";
 import type { StructuralElementRow } from "@/hooks/use-structural-elements";
 import type { CanvasScale } from "@/lib/canvas-scale";
 import { cmToPx } from "@/lib/canvas-scale";
-import { resolveWallDrop, type PlacedStructural } from "@/lib/wall-snap";
+import { resolveWallDrop, previewWallPosition, type PlacedStructural } from "@/lib/wall-snap";
 import { STRUCTURAL_COLORS } from "@/lib/structural-colors";
 import type { WallSide } from "@/lib/supabase/types";
 
@@ -78,6 +78,12 @@ export function StructuralBlock({
     dragState.current = { startClientX: e.clientX, startClientY: e.clientY, moved: false };
   }
 
+  // Live tracking always updates the DOM every frame using the *unvalidated*
+  // nearest-wall preview — decoupled from whether that spot would actually be
+  // accepted, so the bar visually follows the pointer with no lag or freeze
+  // (previously it only moved on frames where the position happened to
+  // validate, which read as a laggy, disconnected drag). Only the final
+  // pointerup position gets validated and persisted.
   function handlePointerMove(e: React.PointerEvent) {
     if (!dragState.current || !elRef.current) return;
     const roomEl = elRef.current.closest("[data-room-id]") as HTMLElement | null;
@@ -91,28 +97,36 @@ export function StructuralBlock({
     const localXcm = (e.clientX - roomRect.left) / scale.pxPerCm;
     const localYcm = (e.clientY - roomRect.top) / scale.pxPerCm;
 
-    const result = resolveWallDrop(element.width_cm, localXcm, localYcm, room, otherElements);
-    if (!result.fits) return;
-
-    const geo = geometryFor(result.wall_side, result.offset_cm, element.width_cm, room, scale);
+    const preview = previewWallPosition(element.width_cm, localXcm, localYcm, room);
+    const geo = geometryFor(preview.wall_side, preview.offset_cm, element.width_cm, room, scale);
     Object.assign(elRef.current.style, geo);
-    elRef.current.dataset.pendingWall = result.wall_side;
-    elRef.current.dataset.pendingOffset = String(result.offset_cm);
   }
 
-  function handlePointerUp() {
+  function handlePointerUp(e: React.PointerEvent) {
     if (!dragState.current || !elRef.current) return;
     const { moved } = dragState.current;
-    const pendingWall = elRef.current.dataset.pendingWall as WallSide | undefined;
-    const pendingOffset = elRef.current.dataset.pendingOffset;
     dragState.current = null;
 
     if (!moved) {
       onSelect();
       return;
     }
-    if (pendingWall !== undefined && pendingOffset !== undefined) {
-      onDragEnd(pendingWall, Number(pendingOffset));
+
+    const roomEl = elRef.current.closest("[data-room-id]") as HTMLElement | null;
+    const roomRect = roomEl?.getBoundingClientRect();
+    if (!roomRect) return;
+
+    const localXcm = (e.clientX - roomRect.left) / scale.pxPerCm;
+    const localYcm = (e.clientY - roomRect.top) / scale.pxPerCm;
+    const result = resolveWallDrop(element.width_cm, localXcm, localYcm, room, otherElements);
+
+    if (result.fits) {
+      onDragEnd(result.wall_side, result.offset_cm);
+    } else {
+      // Nowhere valid to land — snap the visual back to where it actually
+      // still is server-side, rather than leaving it stuck at the last
+      // (unvalidated) preview position.
+      Object.assign(elRef.current.style, geometry);
     }
   }
 
