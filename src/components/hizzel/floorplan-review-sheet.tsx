@@ -17,23 +17,20 @@ interface DraftFloor {
 }
 
 // Reviews and lets the user correct an AI extraction before anything is
-// written — nothing here touches the database until "Import". Only the
-// FIRST detected floor replaces an existing area (when reviewing a
-// re-upload); any additional floors the AI found on the same sheet always
-// become new areas, since "replace" only makes sense for the plan you were
-// already looking at.
+// written — nothing here touches the database until "Import". When
+// reviewing a re-upload, Import replaces the property's *entire* existing
+// floor plan (every area, not just whichever one was on screen) so a
+// multi-floor extraction can't leave stale duplicate areas behind.
 export function FloorPlanReviewSheet({
   propertyId,
   moveId,
-  existingAreaId,
-  existingRoomCount,
+  hasExistingPlan,
   extraction,
   onClose,
 }: {
   propertyId: string;
   moveId: string | undefined;
-  existingAreaId?: string;
-  existingRoomCount?: number;
+  hasExistingPlan: boolean;
   extraction: ExtractResponse;
   onClose: () => void;
 }) {
@@ -74,14 +71,11 @@ export function FloorPlanReviewSheet({
     setSaving(true);
     setError(null);
     try {
-      for (const [index, floor] of floors.entries()) {
-        await importFloorPlan.mutateAsync({
-          propertyId,
-          areaId: index === 0 ? (existingAreaId ?? null) : null,
-          areaName: floor.areaName,
-          rooms: floor.rooms,
-        });
-      }
+      await importFloorPlan.mutateAsync({
+        propertyId,
+        replaceExisting: hasExistingPlan,
+        floors,
+      });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -89,18 +83,16 @@ export function FloorPlanReviewSheet({
     }
   }
 
-  const willReplace = !!existingAreaId && (existingRoomCount ?? 0) > 0;
   const hasAnyRooms = floors.some((f) => f.rooms.length > 0);
 
   return (
     <Sheet title="Review floor plan" onClose={onClose}>
       <div className="flex min-h-0 flex-1 flex-col">
         <SheetBody>
-          {willReplace && (
+          {hasExistingPlan && (
             <p className="mb-3 rounded-[11px] bg-linen-field px-3.5 py-3 text-xs text-linen-ink-secondary">
-              This replaces your current floor plan — its {existingRoomCount} room
-              {existingRoomCount === 1 ? "" : "s"} will be removed, and anything placed in{" "}
-              {existingRoomCount === 1 ? "it" : "them"} sent back to the tray.
+              This replaces your current floor plan — its areas and rooms will be removed,
+              and anything placed in them sent back to the tray.
             </p>
           )}
           {floors.map((floor, fi) => (

@@ -65,6 +65,49 @@ export function useCreateRoom(areaId: string | undefined) {
   });
 }
 
+// Also covers moving a room to a different area (area_id) — invalidates
+// broadly (every area's cached room list, not just one) since a move
+// touches two areas' lists at once.
+export function useUpdateRoom() {
+  const supabase = createClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      name?: string;
+      width_cm?: number;
+      depth_cm?: number;
+      area_id?: string;
+    }) => {
+      const { id, ...changes } = input;
+      const { error } = await supabase.from("rooms").update(changes).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
+    },
+  });
+}
+
+// Deleting a room returns anything placed in it to the tray for free —
+// placements.room_id is `references rooms(id) on delete set null`.
+export function useDeleteRoom(areaId: string | undefined, moveId: string | undefined) {
+  const supabase = createClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("rooms").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rooms", areaId] });
+      queryClient.invalidateQueries({ queryKey: ["move-items", moveId] });
+    },
+  });
+}
+
 export function useUpdateRoomPosition(areaId: string | undefined) {
   const supabase = createClient();
   const queryClient = useQueryClient();

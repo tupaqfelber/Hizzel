@@ -62,6 +62,16 @@ export function HizzelMidPanel({
     }
   }
 
+  function handlePlanButtonClick() {
+    if ((areas?.length ?? 0) > 0) {
+      const confirmed = window.confirm(
+        "Uploading a new plan will delete your existing floor plan — all its areas and rooms will be removed, and anything placed in them returned to the tray. Continue?",
+      );
+      if (!confirmed) return;
+    }
+    planFileInputRef.current?.click();
+  }
+
   const thumbRef = useRef<HTMLDivElement>(null);
   const [thumbSize, setThumbSize] = useState({ width: 0, height: 0 });
 
@@ -134,7 +144,7 @@ export function HizzelMidPanel({
           </button>
           <button
             type="button"
-            onClick={() => planFileInputRef.current?.click()}
+            onClick={handlePlanButtonClick}
             disabled={extracting}
             className="flex items-center gap-1 rounded-lg border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-[7px] py-[3px] text-[9px] font-medium text-dark-tool-label disabled:opacity-60"
           >
@@ -261,8 +271,7 @@ export function HizzelMidPanel({
         <FloorPlanReviewSheet
           propertyId={newProperty.id}
           moveId={move?.id}
-          existingAreaId={area?.id}
-          existingRoomCount={rooms?.length}
+          hasExistingPlan={(areas?.length ?? 0) > 0}
           extraction={reviewData}
           onClose={() => setReviewData(null)}
         />

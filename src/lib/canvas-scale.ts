@@ -17,6 +17,13 @@ export interface CanvasScale {
   minYCm: number;
   contentWidthPx: number;
   contentHeightPx: number;
+  // Centers the (already fit-to-viewport) content within the viewport —
+  // without this, a room bounding box whose aspect ratio doesn't match the
+  // viewport's leaves all its leftover space on the right/bottom (the
+  // uniform scale only shrinks to fit, it doesn't reposition), reading as
+  // "small and shoved into the top-left corner".
+  offsetXPx: number;
+  offsetYPx: number;
 }
 
 const DEFAULT_PADDING_PX = 32;
@@ -35,6 +42,8 @@ export function computeCanvasScale(
       minYCm: 0,
       contentWidthPx: 0,
       contentHeightPx: 0,
+      offsetXPx: 0,
+      offsetYPx: 0,
     };
   }
 
@@ -54,15 +63,31 @@ export function computeCanvasScale(
     availableHeight / contentHeightCm,
   );
 
+  const contentWidthPx = contentWidthCm * pxPerCm;
+  const contentHeightPx = contentHeightCm * pxPerCm;
+
   return {
     pxPerCm,
     minXCm,
     minYCm,
-    contentWidthPx: contentWidthCm * pxPerCm,
-    contentHeightPx: contentHeightCm * pxPerCm,
+    contentWidthPx,
+    contentHeightPx,
+    offsetXPx: Math.max(viewportWidth - contentWidthPx, 0) / 2,
+    offsetYPx: Math.max(viewportHeight - contentHeightPx, 0) / 2,
   };
 }
 
 export function cmToPx(cm: number, scale: CanvasScale) {
   return cm * scale.pxPerCm;
+}
+
+// For actual on-screen POSITION (left/top) only — not size (width/height),
+// which stays a plain cmToPx. Centers the content within the viewport;
+// see the offsetXPx/offsetYPx comment on CanvasScale for why this exists.
+export function canvasXToPx(cm: number, scale: CanvasScale) {
+  return cm * scale.pxPerCm + scale.offsetXPx;
+}
+
+export function canvasYToPx(cm: number, scale: CanvasScale) {
+  return cm * scale.pxPerCm + scale.offsetYPx;
 }

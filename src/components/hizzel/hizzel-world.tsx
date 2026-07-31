@@ -15,7 +15,7 @@ import {
 } from "@tabler/icons-react";
 import { useCurrentMove } from "@/hooks/use-current-move";
 import { useAreas, useUpdateArea } from "@/hooks/use-areas";
-import { useRooms, useUpdateRoomPosition } from "@/hooks/use-rooms";
+import { useRooms, useUpdateRoomPosition, useUpdateRoom } from "@/hooks/use-rooms";
 import { useMoveItems, usePlaceItem } from "@/hooks/use-move-items";
 import { useFlashStore } from "@/hooks/use-flash-store";
 import { categoryFlashColor } from "@/lib/category-colors";
@@ -62,6 +62,8 @@ export function HizzelWorld({
   const [myHizzelOpen, setMyHizzelOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
 
   // Default to the first area once loaded, without a setState-in-effect.
@@ -74,6 +76,7 @@ export function HizzelWorld({
   const { data: rooms } = useRooms(selectedAreaId);
   const updateArea = useUpdateArea(newProperty?.id);
   const updateRoomPosition = useUpdateRoomPosition(selectedAreaId);
+  const updateRoom = useUpdateRoom();
   const { data: items } = useMoveItems(move?.id);
   const placeItem = usePlaceItem(move?.id);
   const flashingIds = useFlashStore((s) => s.flashingIds);
@@ -286,9 +289,23 @@ export function HizzelWorld({
     }
   }
 
+  // A room "rotate" is just a width/depth swap — a room is a plain
+  // rectangle in this 2D plan, so there's nothing else a 90° turn would
+  // need to change. No fit/collision check against sibling rooms (unlike
+  // item rotate) — this is a quick fix-up tool for AI-guessed orientation,
+  // not a placement engine; if it overlaps afterward, dragging already
+  // handles nudging rooms apart.
+  function handleRotateRoom(roomId: string) {
+    const room = rooms?.find((r) => r.id === roomId);
+    if (!room) return;
+    updateRoom.mutate({ id: room.id, width_cm: room.depth_cm, depth_cm: room.width_cm });
+  }
+
   const draggedItem = drag ? items?.find((i) => i.id === drag.itemId) : undefined;
   const selectedItem = selectedItemId ? items?.find((i) => i.id === selectedItemId) : undefined;
   const selectedItemFlashing = selectedItemId ? flashingIds.has(selectedItemId) : false;
+  const selectedRoom = selectedRoomId ? rooms?.find((r) => r.id === selectedRoomId) : undefined;
+  const hasSelection = !!selectedItem || !!selectedRoom;
 
   async function handlePlanFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -304,6 +321,16 @@ export function HizzelWorld({
     } finally {
       setExtracting(false);
     }
+  }
+
+  function handlePlanButtonClick() {
+    if ((areas?.length ?? 0) > 0) {
+      const confirmed = window.confirm(
+        "Uploading a new plan will delete your existing floor plan — all its areas and rooms will be removed, and anything placed in them returned to the tray. Continue?",
+      );
+      if (!confirmed) return;
+    }
+    planFileInputRef.current?.click();
   }
 
   return (
@@ -364,7 +391,7 @@ export function HizzelWorld({
         </button>
         <button
           type="button"
-          onClick={() => planFileInputRef.current?.click()}
+          onClick={handlePlanButtonClick}
           disabled={extracting}
           className="flex items-center gap-1 rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-3.5 py-[7px] text-[11px] font-medium whitespace-nowrap text-dark-tool-label disabled:opacity-60"
         >
@@ -392,20 +419,23 @@ export function HizzelWorld({
             row's lg:flex-row-reverse flips that to left-of-padlock on
             desktop, with no reversal needed on this group's own children —
             rotate, edit, name, close reads the same way on both. */}
-        {selectedItem && (
+        {hasSelection && (
           <div
             className={`flex items-center gap-1 rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-2 py-[5px] ${
               selectedItemFlashing ? "animate-item-flash" : ""
             }`}
             style={
-              selectedItemFlashing
+              selectedItemFlashing && selectedItem
                 ? ({ "--flash-color": categoryFlashColor(selectedItem.category) } as React.CSSProperties)
                 : undefined
             }
           >
             <button
               type="button"
-              onClick={() => handleRotate(selectedItem.id)}
+              onClick={() => {
+                if (selectedItem) handleRotate(selectedItem.id);
+                else if (selectedRoom) handleRotateRoom(selectedRoom.id);
+              }}
               aria-label="Rotate"
               className="flex h-6 w-6 shrink-0 items-center justify-center text-dark-tool-label"
             >
@@ -413,18 +443,24 @@ export function HizzelWorld({
             </button>
             <button
               type="button"
-              onClick={() => setEditingItemId(selectedItem.id)}
+              onClick={() => {
+                if (selectedItem) setEditingItemId(selectedItem.id);
+                else if (selectedRoom) setEditingRoomId(selectedRoom.id);
+              }}
               aria-label="Edit"
               className="flex h-6 w-6 shrink-0 items-center justify-center text-dark-tool-label"
             >
               <IconPencil size={13} />
             </button>
             <span className="max-w-[88px] truncate text-[11px] font-medium whitespace-nowrap text-dark-tool-label lg:max-w-[160px]">
-              {selectedItem.name}
+              {selectedItem?.name ?? selectedRoom?.name}
             </span>
             <button
               type="button"
-              onClick={() => setSelectedItemId(null)}
+              onClick={() => {
+                setSelectedItemId(null);
+                setSelectedRoomId(null);
+              }}
               aria-label="Deselect"
               className="flex h-6 w-6 shrink-0 items-center justify-center text-dark-tool-label"
             >
@@ -436,7 +472,7 @@ export function HizzelWorld({
         <button
           type="button"
           aria-label="Search"
-          className={`${selectedItem ? "hidden lg:flex" : "flex"} h-9 w-10 shrink-0 items-center justify-center rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] text-dark-ink-secondary`}
+          className={`${hasSelection ? "hidden lg:flex" : "flex"} h-9 w-10 shrink-0 items-center justify-center rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] text-dark-ink-secondary`}
         >
           <IconSearch size={16} />
         </button>
@@ -454,7 +490,10 @@ export function HizzelWorld({
 
       <div
         ref={canvasRef}
-        onClick={() => setSelectedItemId(null)}
+        onClick={() => {
+          setSelectedItemId(null);
+          setSelectedRoomId(null);
+        }}
         className="relative flex-1 overflow-hidden"
       >
         <div className="absolute top-2.5 right-2.5 text-[9px] font-medium tracking-[0.1em] text-dark-ink/20">
@@ -466,8 +505,13 @@ export function HizzelWorld({
             room={room}
             scale={scale}
             locked={!!selectedArea?.is_locked}
+            selected={selectedRoomId === room.id}
             otherRooms={rooms.filter((r) => r.id !== room.id)}
             onDragEnd={(x, y) => updateRoomPosition.mutate({ id: room.id, canvas_x: x, canvas_y: y })}
+            onSelect={() => {
+              setSelectedRoomId(room.id);
+              setSelectedItemId(null);
+            }}
           >
             {(itemsByRoom.get(room.id) ?? []).map((item) =>
               item.x_cm == null || item.y_cm == null ? null : (
@@ -521,12 +565,25 @@ export function HizzelWorld({
             <ThingFormSheet thing={editingItem} onClose={() => setEditingItemId(null)} />
           ) : null;
         })()}
+      {editingRoomId &&
+        selectedAreaId &&
+        (() => {
+          const editingRoom = rooms?.find((r) => r.id === editingRoomId);
+          return editingRoom ? (
+            <RoomFormSheet
+              areaId={selectedAreaId}
+              moveId={move?.id}
+              room={editingRoom}
+              areas={areas}
+              onClose={() => setEditingRoomId(null)}
+            />
+          ) : null;
+        })()}
       {reviewData && newProperty && (
         <FloorPlanReviewSheet
           propertyId={newProperty.id}
           moveId={move?.id}
-          existingAreaId={selectedAreaId}
-          existingRoomCount={rooms?.length}
+          hasExistingPlan={(areas?.length ?? 0) > 0}
           extraction={reviewData}
           onClose={() => setReviewData(null)}
         />
