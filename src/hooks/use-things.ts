@@ -20,7 +20,7 @@ export interface ThingGroup {
   items: ThingItem[];
 }
 
-const UNASSIGNED = "Unassigned";
+export const UNASSIGNED = "Unassigned";
 
 export function useGroupedThings(moveId: string | undefined) {
   const supabase = createClient();

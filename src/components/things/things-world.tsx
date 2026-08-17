@@ -11,7 +11,7 @@ import { ThingFormSheet } from "@/components/things/thing-form-sheet";
 import { MyHizzelOverlay } from "@/components/my-hizzel/my-hizzel-overlay";
 import { DragGhost } from "@/components/hizzel/drag-ghost";
 import { useCurrentMove } from "@/hooks/use-current-move";
-import { useGroupedThings, useSendToTray, type ThingItem } from "@/hooks/use-things";
+import { useGroupedThings, useSendToTray, UNASSIGNED, type ThingItem } from "@/hooks/use-things";
 import { useMoveItems, usePlaceItem } from "@/hooks/use-move-items";
 import { useFlashStore } from "@/hooks/use-flash-store";
 import { rotatedFootprint, resolvePlacement } from "@/lib/item-snap";
@@ -147,6 +147,10 @@ export function ThingsWorld({
       // diptych) — a drop here is explicit tray intent, same as missing
       // every room inside the Mid zone below.
       const inTrayZone = !!el?.closest("[data-hizzel-tray]");
+      // Dragging a room-placed card and dropping it back on Things world's
+      // own Unassigned group — same explicit "send to tray" intent as the
+      // arrow button, just via drag instead of tap.
+      const inUnassignedZone = !!el?.closest("[data-unassigned-zone]");
 
       if (draggedItem && roomEl) {
         const roomId = roomEl.dataset.roomId!;
@@ -221,13 +225,13 @@ export function ThingsWorld({
             useFlashStore.getState().flash(unplacedId);
           }
         }
-      } else if (draggedItem && (inMidZone || inTrayZone)) {
+      } else if (draggedItem && (inMidZone || inTrayZone || inUnassignedZone)) {
         // Missed every room but still landed in a recognized "send to
-        // tray" zone — the Mid panel (thumbnail gaps or the drawer), or
-        // the full Hizzel world's tray strip. Confirm it as unassigned
-        // rather than leaving the drop looking like it did nothing. It's
-        // already unassigned by default with no placement row, so this
-        // just re-affirms that and flashes it.
+        // tray" zone — the Mid panel (thumbnail gaps or the drawer), the
+        // full Hizzel world's tray strip, or Things world's own Unassigned
+        // group. Confirm it as unassigned rather than leaving the drop
+        // looking like it did nothing. It's already unassigned by default
+        // with no placement row, so this just re-affirms that and flashes it.
         placeItem.mutate({
           thingId: thing.id,
           roomId: null,
@@ -310,7 +314,7 @@ export function ThingsWorld({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[90px] [scrollbar-width:none] lg:px-9 lg:pb-10">
         {groups.map((group) => (
-          <div key={group.roomName}>
+          <div key={group.roomName} data-unassigned-zone={group.roomName === UNASSIGNED ? "" : undefined}>
             <div className="pt-2.5 pb-2 text-[10px] font-medium tracking-[0.1em] text-linen-ink-tertiary uppercase lg:text-xs">
               {group.roomName}
             </div>
