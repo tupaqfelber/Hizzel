@@ -15,6 +15,13 @@ export interface MoveItem {
   x_cm: number | null;
   y_cm: number | null;
   rotation_deg: number;
+  // Whether a placements row exists at all for this thing, regardless of
+  // its room_id. A thing that's never been touched has no row and
+  // roomId collapses to null the same as one that was explicitly sent
+  // back to the tray — this is the only way to tell those two apart.
+  // Hizzel's tray must only show the latter (see hasPlacement's use in
+  // HizzelWorld/HizzelMidPanel's tray filter).
+  hasPlacement: boolean;
 }
 
 export function useMoveItems(moveId: string | undefined) {
@@ -47,6 +54,7 @@ export function useMoveItems(moveId: string | undefined) {
           x_cm: p?.x_cm ?? null,
           y_cm: p?.y_cm ?? null,
           rotation_deg: p?.rotation_deg ?? 0,
+          hasPlacement: !!p,
         };
       });
     },
@@ -93,6 +101,11 @@ export function usePlaceItem(moveId: string | undefined) {
                 x_cm: input.x_cm,
                 y_cm: input.y_cm,
                 rotation_deg: input.rotation_deg,
+                // This call always upserts a placements row, whatever
+                // roomId it's setting — so the item now has one, even if
+                // it never did before (e.g. a never-touched thing dropped
+                // straight onto the tray).
+                hasPlacement: true,
               }
             : item,
         ),

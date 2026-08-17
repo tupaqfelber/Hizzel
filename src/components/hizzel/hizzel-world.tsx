@@ -109,12 +109,16 @@ export function HizzelWorld({
   const scale = computeCanvasScale(rooms ?? [], canvasSize.width, canvasSize.height);
 
   const roomIdSet = new Set((rooms ?? []).map((r) => r.id));
-  // The tray is a stable, explicit set — items with no placement at all
-  // (never placed, or sent back here) — not "whatever isn't on the floor
-  // currently being viewed". An item placed in a *different* area's room
-  // still has a roomId and must stay put, not flicker into the tray just
-  // because that area isn't the one on screen right now.
-  const trayItems = (items ?? []).filter((i) => !i.roomId);
+  // The tray is a stable, EXPLICIT set — not "everything unassigned"
+  // (that's Things world's own Unassigned list, which can be huge and
+  // includes things that have simply never been touched). A thing with no
+  // placements row at all and one that was deliberately sent back here
+  // both read as roomId: null — hasPlacement is what tells them apart.
+  // Also not "whatever isn't on the floor currently being viewed": an
+  // item placed in a *different* area's room still has a roomId and must
+  // stay put, not flicker into the tray just because that area isn't the
+  // one on screen right now.
+  const trayItems = (items ?? []).filter((i) => !i.roomId && i.hasPlacement);
   const itemsByRoom = new Map<string, typeof trayItems>();
   for (const item of items ?? []) {
     if (item.roomId && roomIdSet.has(item.roomId)) {

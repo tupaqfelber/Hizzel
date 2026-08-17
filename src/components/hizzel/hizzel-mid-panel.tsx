@@ -101,10 +101,11 @@ export function HizzelMidPanel({
   const scale = computeCanvasScale(rooms ?? [], thumbSize.width, thumbSize.height, 6);
 
   const roomIdSet = new Set((rooms ?? []).map((r) => r.id));
-  // Same fix as HizzelWorld's trayItems — this mirrors the tray (items with
-  // no placement at all), not the full unassigned list from Things world,
-  // and must stay stable regardless of which area's rooms are loaded here.
-  const unassigned = (items ?? []).filter((i) => !i.roomId);
+  // Same fix as HizzelWorld's trayItems — this mirrors the tray (items
+  // explicitly sent here, via hasPlacement), not the full unassigned list
+  // from Things world, and must stay stable regardless of which area's
+  // rooms are loaded here.
+  const unassigned = (items ?? []).filter((i) => !i.roomId && i.hasPlacement);
   const itemsByRoom = new Map<string, MoveItem[]>();
   for (const item of items ?? []) {
     if (item.roomId && roomIdSet.has(item.roomId) && item.x_cm != null && item.y_cm != null) {
