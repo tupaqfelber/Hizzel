@@ -546,18 +546,24 @@ export function HizzelWorld({
         )}
       </div>
 
-      {trayItems.length > 0 && (
-        <div className="flex shrink-0 gap-3 overflow-x-auto px-4 py-3 [scrollbar-width:none] lg:pl-24">
-          {trayItems.map((item) => (
-            <TrayCard
-              key={item.id}
-              item={item}
-              dragging={drag?.itemId === item.id}
-              onPointerDown={(e) => startDrag(item.id, e)}
-            />
-          ))}
-        </div>
-      )}
+      {/* data-hizzel-tray marks this as a valid cross-world drop target
+          (see things-world.tsx's startCardDrag) — always rendered, even
+          with zero items, so dragging the very first thing into an empty
+          tray still has somewhere to land. empty:py-0 collapses it to no
+          height when there's nothing in it, so it stays invisible. */}
+      <div
+        data-hizzel-tray
+        className="flex shrink-0 gap-3 overflow-x-auto px-4 py-3 empty:py-0 [scrollbar-width:none] lg:pl-24"
+      >
+        {trayItems.map((item) => (
+          <TrayCard
+            key={item.id}
+            item={item}
+            dragging={drag?.itemId === item.id}
+            onPointerDown={(e) => startDrag(item.id, e)}
+          />
+        ))}
+      </div>
 
       {/* Reserves space for the shared bottom toggle bar, now rendered by
           AppShell as a fixed overlay spanning both worlds. */}

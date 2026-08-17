@@ -143,6 +143,10 @@ export function ThingsWorld({
       // as unassigned instead of silently doing nothing.
       const inMidZone =
         !!el?.closest("[data-hizzel-mid-zone]") || !!roomEl?.closest("[data-hizzel-mid-zone]");
+      // The full Hizzel world's own tray strip (visible in the desktop
+      // diptych) — a drop here is explicit tray intent, same as missing
+      // every room inside the Mid zone below.
+      const inTrayZone = !!el?.closest("[data-hizzel-tray]");
 
       if (draggedItem && roomEl) {
         const roomId = roomEl.dataset.roomId!;
@@ -217,13 +221,13 @@ export function ThingsWorld({
             useFlashStore.getState().flash(unplacedId);
           }
         }
-      } else if (draggedItem && inMidZone) {
-        // Missed every room but still landed in the Mid panel (the
-        // thumbnail's gaps between rooms, or the drawer itself) — confirm
-        // it as unassigned rather than leaving the drop looking like it
-        // did nothing. It's already unassigned by default with no
-        // placement row, so this just re-affirms that and flashes it in
-        // the drawer list.
+      } else if (draggedItem && (inMidZone || inTrayZone)) {
+        // Missed every room but still landed in a recognized "send to
+        // tray" zone — the Mid panel (thumbnail gaps or the drawer), or
+        // the full Hizzel world's tray strip. Confirm it as unassigned
+        // rather than leaving the drop looking like it did nothing. It's
+        // already unassigned by default with no placement row, so this
+        // just re-affirms that and flashes it.
         placeItem.mutate({
           thingId: thing.id,
           roomId: null,
