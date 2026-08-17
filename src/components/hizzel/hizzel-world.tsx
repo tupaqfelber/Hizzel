@@ -109,7 +109,12 @@ export function HizzelWorld({
   const scale = computeCanvasScale(rooms ?? [], canvasSize.width, canvasSize.height);
 
   const roomIdSet = new Set((rooms ?? []).map((r) => r.id));
-  const trayItems = (items ?? []).filter((i) => !i.roomId || !roomIdSet.has(i.roomId));
+  // The tray is a stable, explicit set — items with no placement at all
+  // (never placed, or sent back here) — not "whatever isn't on the floor
+  // currently being viewed". An item placed in a *different* area's room
+  // still has a roomId and must stay put, not flicker into the tray just
+  // because that area isn't the one on screen right now.
+  const trayItems = (items ?? []).filter((i) => !i.roomId);
   const itemsByRoom = new Map<string, typeof trayItems>();
   for (const item of items ?? []) {
     if (item.roomId && roomIdSet.has(item.roomId)) {
