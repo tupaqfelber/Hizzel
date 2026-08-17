@@ -200,16 +200,27 @@ export function useSendToTray(moveId: string | undefined) {
   return useMutation({
     mutationFn: async (thingId: string) => {
       if (!moveId) throw new Error("No current move");
-      const { error } = await supabase
-        .from("placements")
-        .upsert(
-          { thing_id: thingId, move_id: moveId, room_id: null, rotation_deg: 0 },
-          { onConflict: "thing_id,move_id" },
-        );
+      const { error } = await supabase.from("placements").upsert(
+        {
+          thing_id: thingId,
+          move_id: moveId,
+          room_id: null,
+          x_cm: null,
+          y_cm: null,
+          rotation_deg: 0,
+        },
+        { onConflict: "thing_id,move_id" },
+      );
       if (error) throw error;
     },
     onSuccess: () => {
+      // Things world's own grouped list *and* Hizzel world's tray both read
+      // this same placement change — usePlaceItem (the reverse direction,
+      // Hizzel → tray) invalidates both keys already; this was only doing
+      // the first half, leaving Hizzel's tray stale until something else
+      // happened to refetch it.
       queryClient.invalidateQueries({ queryKey: ["things-grouped"] });
+      queryClient.invalidateQueries({ queryKey: ["move-items", moveId] });
     },
   });
 }
