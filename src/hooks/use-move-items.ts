@@ -15,13 +15,52 @@ export interface MoveItem {
   x_cm: number | null;
   y_cm: number | null;
   rotation_deg: number;
-  // Whether a placements row exists at all for this thing, regardless of
-  // its room_id. A thing that's never been touched has no row and
-  // roomId collapses to null the same as one that was explicitly sent
-  // back to the tray — this is the only way to tell those two apart.
-  // Hizzel's tray must only show the latter (see hasPlacement's use in
-  // HizzelWorld/HizzelMidPanel's tray filter).
-  hasPlacement: boolean;
+  // Explicit "belongs in Hizzel's tray" flag — room_id: null alone can't
+  // carry this: it's identical whether a thing has never been touched, was
+  // sent straight to the tray, or was just moved to Unassigned within
+  // Things (which should NOT show up in the tray). See the migration
+  // comment (20260817120000_placements_in_tray.sql) for the full reasoning.
+  inTray: boolean;
+}
+
+// `placements.in_tray` isn't in the generated Database type yet — added by
+// a migration (supabase/migrations/20260817120000_placements_in_tray.sql)
+// that hasn't been applied to the live project. Once it's applied,
+// regenerate src/lib/supabase/types.ts and delete this interface + the
+// casts below, same as the import_floor_plan RPC cast in
+// use-floorplan-import.ts.
+interface PlacementRow {
+  thing_id: string;
+  room_id: string | null;
+  x_cm: number | null;
+  y_cm: number | null;
+  rotation_deg: number;
+  in_tray: boolean;
+}
+
+interface PlacementsTable {
+  from(table: "placements"): {
+    select(cols: string): {
+      eq(
+        col: string,
+        val: string,
+      ): Promise<
+        { data: PlacementRow[]; error: null } | { data: null; error: { message: string } }
+      >;
+    };
+    upsert(
+      values: {
+        thing_id: string;
+        move_id: string;
+        room_id: string | null;
+        x_cm: number | null;
+        y_cm: number | null;
+        rotation_deg: number;
+        in_tray: boolean;
+      },
+      opts: { onConflict: string },
+    ): Promise<{ error: { message: string } | null }>;
+  };
 }
 
 export function useMoveItems(moveId: string | undefined) {
@@ -36,9 +75,9 @@ export function useMoveItems(moveId: string | undefined) {
           .from("things")
           .select("id, name, category, width_cm, depth_cm, height_cm, photo_url, notes")
           .order("name"),
-        supabase
+        (supabase as unknown as PlacementsTable)
           .from("placements")
-          .select("thing_id, room_id, x_cm, y_cm, rotation_deg")
+          .select("thing_id, room_id, x_cm, y_cm, rotation_deg, in_tray")
           .eq("move_id", moveId!),
       ]);
       if (thingsRes.error) throw thingsRes.error;
@@ -54,7 +93,7 @@ export function useMoveItems(moveId: string | undefined) {
           x_cm: p?.x_cm ?? null,
           y_cm: p?.y_cm ?? null,
           rotation_deg: p?.rotation_deg ?? 0,
-          hasPlacement: !!p,
+          inTray: p?.in_tray ?? false,
         };
       });
     },
@@ -67,6 +106,14 @@ interface PlaceInput {
   x_cm: number | null;
   y_cm: number | null;
   rotation_deg: number;
+  // Only meaningful when roomId is null. Defaults to true — every existing
+  // call site (drag/drop a placed item back to the tray, a rejected
+  // placement bouncing back, confirming unassigned in Hizzel's Mid/tray
+  // zones) genuinely means "send to tray". The one exception is dragging
+  // to Unassigned within Things world, which explicitly passes false.
+  // Ignored (forced false) whenever roomId is set — a placed item is never
+  // "in the tray".
+  inTray?: boolean;
 }
 
 export function usePlaceItem(moveId: string | undefined) {
@@ -76,7 +123,7 @@ export function usePlaceItem(moveId: string | undefined) {
   return useMutation({
     mutationFn: async (input: PlaceInput) => {
       if (!moveId) throw new Error("No current move");
-      const { error } = await supabase.from("placements").upsert(
+      const { error } = await (supabase as unknown as PlacementsTable).from("placements").upsert(
         {
           thing_id: input.thingId,
           move_id: moveId,
@@ -84,6 +131,7 @@ export function usePlaceItem(moveId: string | undefined) {
           x_cm: input.x_cm,
           y_cm: input.y_cm,
           rotation_deg: input.rotation_deg,
+          in_tray: input.roomId === null ? (input.inTray ?? true) : false,
         },
         { onConflict: "thing_id,move_id" },
       );
@@ -101,11 +149,7 @@ export function usePlaceItem(moveId: string | undefined) {
                 x_cm: input.x_cm,
                 y_cm: input.y_cm,
                 rotation_deg: input.rotation_deg,
-                // This call always upserts a placements row, whatever
-                // roomId it's setting — so the item now has one, even if
-                // it never did before (e.g. a never-touched thing dropped
-                // straight onto the tray).
-                hasPlacement: true,
+                inTray: input.roomId === null ? (input.inTray ?? true) : false,
               }
             : item,
         ),

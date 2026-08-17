@@ -22,6 +22,26 @@ export interface ThingGroup {
 
 export const UNASSIGNED = "Unassigned";
 
+// `placements.in_tray` isn't in the generated Database type yet — see the
+// matching comment in use-move-items.ts for the full explanation. Delete
+// this cast once the migration's applied and types are regenerated.
+interface PlacementsTable {
+  from(table: "placements"): {
+    upsert(
+      values: {
+        thing_id: string;
+        move_id: string;
+        room_id: string | null;
+        x_cm: number | null;
+        y_cm: number | null;
+        rotation_deg: number;
+        in_tray: boolean;
+      },
+      opts: { onConflict: string },
+    ): Promise<{ error: { message: string } | null }>;
+  };
+}
+
 export function useGroupedThings(moveId: string | undefined) {
   const supabase = createClient();
 
@@ -200,7 +220,7 @@ export function useSendToTray(moveId: string | undefined) {
   return useMutation({
     mutationFn: async (thingId: string) => {
       if (!moveId) throw new Error("No current move");
-      const { error } = await supabase.from("placements").upsert(
+      const { error } = await (supabase as unknown as PlacementsTable).from("placements").upsert(
         {
           thing_id: thingId,
           move_id: moveId,
@@ -208,6 +228,9 @@ export function useSendToTray(moveId: string | undefined) {
           x_cm: null,
           y_cm: null,
           rotation_deg: 0,
+          // The arrow's whole purpose is "send to tray" — unlike a plain
+          // drag to Things' own Unassigned zone, this is always explicit.
+          in_tray: true,
         },
         { onConflict: "thing_id,move_id" },
       );

@@ -226,18 +226,18 @@ export function ThingsWorld({
           }
         }
       } else if (draggedItem && (inMidZone || inTrayZone || inUnassignedZone)) {
-        // Missed every room but still landed in a recognized "send to
-        // tray" zone — the Mid panel (thumbnail gaps or the drawer), the
-        // full Hizzel world's tray strip, or Things world's own Unassigned
-        // group. Confirm it as unassigned rather than leaving the drop
-        // looking like it did nothing. It's already unassigned by default
-        // with no placement row, so this just re-affirms that and flashes it.
+        // Missed every room but still landed in a recognized drop zone.
+        // Hizzel's Mid panel / tray strip is explicit "send to tray"
+        // intent, same as the arrow. Things' own Unassigned group is NOT —
+        // that's just taking it out of the room, and shouldn't clutter the
+        // tray any more than a thing that's never been touched would.
         placeItem.mutate({
           thingId: thing.id,
           roomId: null,
           x_cm: null,
           y_cm: null,
           rotation_deg: draggedItem.rotation_deg,
+          inTray: !inUnassignedZone,
         });
         useFlashStore.getState().flash(thing.id);
       }
