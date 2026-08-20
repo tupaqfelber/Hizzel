@@ -162,6 +162,22 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" }) 
         </div>
       </div>
 
+      {/* Mobile-only equivalent of the desktop "My Hizzel" pill below —
+          same styling, sitting just above the three-stop slider instead of
+          replacing it, since the slider already owns bottom-7 on mobile.
+          Previously the logo icon inside each world was the only way in on
+          mobile, easy to miss. */}
+      {move && (
+        <button
+          type="button"
+          onClick={() => setMyHizzelOpen(true)}
+          aria-label="Open My Hizzel"
+          className="fixed bottom-20 left-1/2 z-30 flex -translate-x-1/2 items-center rounded-full bg-dark-ink px-5 py-2.5 font-serif text-[13px] tracking-[0.02em] whitespace-nowrap text-dark shadow-lg lg:hidden"
+        >
+          My Hizzel
+        </button>
+      )}
+
       {move && (
         <button
           type="button"
