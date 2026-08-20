@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { IconPlus, IconUpload, IconArrowsDiagonal } from "@tabler/icons-react";
 import { useCurrentMove } from "@/hooks/use-current-move";
-import { useAreas } from "@/hooks/use-areas";
+import { useAreas, useCreateArea } from "@/hooks/use-areas";
 import { useRooms } from "@/hooks/use-rooms";
 import { useMoveItems, type MoveItem } from "@/hooks/use-move-items";
 import { useFlashStore } from "@/hooks/use-flash-store";
@@ -39,7 +39,13 @@ export function HizzelMidPanel({
   const { data: rooms } = useRooms(area?.id);
   const { data: items } = useMoveItems(move?.id);
   const flashingIds = useFlashStore((s) => s.flashingIds);
+  const createArea = useCreateArea(newProperty?.id);
   const [addRoomOpen, setAddRoomOpen] = useState(false);
+  // Same reasoning as HizzelWorld: `area` (areas?.[0]) is undefined with
+  // zero areas, which silently no-op'd this whole button. Tracked
+  // separately from `area` so a just-created area can open the sheet
+  // immediately without waiting on the areas query's refetch.
+  const [addRoomAreaId, setAddRoomAreaId] = useState<string | undefined>(undefined);
   const [extracting, setExtracting] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [reviewData, setReviewData] = useState<ExtractResponse | null>(null);
@@ -60,6 +66,21 @@ export function HizzelMidPanel({
     } finally {
       setExtracting(false);
     }
+  }
+
+  async function handleAddRoomClick() {
+    let areaId = area?.id;
+    if (!areaId && newProperty?.id) {
+      try {
+        areaId = await createArea.mutateAsync("Ground floor");
+      } catch (err) {
+        console.error("Couldn't create a default area for the first room", err);
+        return;
+      }
+    }
+    if (!areaId) return;
+    setAddRoomAreaId(areaId);
+    setAddRoomOpen(true);
   }
 
   function handlePlanButtonClick() {
@@ -141,8 +162,9 @@ export function HizzelMidPanel({
         <div className="mb-1.5 flex items-center justify-between">
           <button
             type="button"
-            onClick={() => area && setAddRoomOpen(true)}
-            className="flex items-center gap-1 rounded-lg border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-[7px] py-[3px] text-[9px] font-medium text-dark-tool-label"
+            onClick={handleAddRoomClick}
+            disabled={createArea.isPending}
+            className="flex items-center gap-1 rounded-lg border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-[7px] py-[3px] text-[9px] font-medium text-dark-tool-label disabled:opacity-60"
           >
             <IconPlus size={9} /> Room
           </button>
@@ -268,8 +290,14 @@ export function HizzelMidPanel({
         )}
       </div>
 
-      {addRoomOpen && area && (
-        <RoomFormSheet areaId={area.id} onClose={() => setAddRoomOpen(false)} />
+      {addRoomOpen && addRoomAreaId && (
+        <RoomFormSheet
+          areaId={addRoomAreaId}
+          onClose={() => {
+            setAddRoomOpen(false);
+            setAddRoomAreaId(undefined);
+          }}
+        />
       )}
       {reviewData && newProperty && (
         <FloorPlanReviewSheet

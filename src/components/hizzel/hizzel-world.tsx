@@ -14,7 +14,7 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { useCurrentMove } from "@/hooks/use-current-move";
-import { useAreas, useUpdateArea } from "@/hooks/use-areas";
+import { useAreas, useUpdateArea, useCreateArea } from "@/hooks/use-areas";
 import { useRooms, useUpdateRoomPosition, useUpdateRoom } from "@/hooks/use-rooms";
 import { useMoveItems, usePlaceItem } from "@/hooks/use-move-items";
 import { useFlashStore } from "@/hooks/use-flash-store";
@@ -54,6 +54,12 @@ export function HizzelWorld({
   const [areaDropdownOpen, setAreaDropdownOpen] = useState(false);
   const [editAreasOpen, setEditAreasOpen] = useState(false);
   const [addRoomOpen, setAddRoomOpen] = useState(false);
+  // Separate from selectedAreaId — after creating a brand-new area on
+  // demand (see handleAddRoomClick), the areas query's refetch can lag a
+  // render or two behind, during which selectedAreaId would still read as
+  // undefined. This is set directly from the mutation's own return value,
+  // so opening the sheet never races the cache.
+  const [addRoomAreaId, setAddRoomAreaId] = useState<string | undefined>(undefined);
   const [extracting, setExtracting] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [reviewData, setReviewData] = useState<ExtractResponse | null>(null);
@@ -75,6 +81,7 @@ export function HizzelWorld({
   const selectedArea = areas?.find((a) => a.id === selectedAreaId);
   const { data: rooms } = useRooms(selectedAreaId);
   const updateArea = useUpdateArea(newProperty?.id);
+  const createArea = useCreateArea(newProperty?.id);
   const updateRoomPosition = useUpdateRoomPosition(selectedAreaId);
   const updateRoom = useUpdateRoom();
   const { data: items } = useMoveItems(move?.id);
@@ -338,6 +345,28 @@ export function HizzelWorld({
     }
   }
 
+  // "+ Room" was a no-op whenever the property had zero areas yet (e.g.
+  // right after "+ New move", which deliberately starts area-less) —
+  // selectedAreaId falls back to areas?.[0]?.id, which is undefined with
+  // no areas, and the sheet's render guard silently skipped opening. This
+  // transparently creates a first area on demand so the button always
+  // works, matching "the clear, obvious path for anyone without a plan".
+  async function handleAddRoomClick() {
+    let areaId = selectedAreaId;
+    if (!areaId && newProperty?.id) {
+      try {
+        areaId = await createArea.mutateAsync("Ground floor");
+        setChosenAreaId(areaId);
+      } catch (err) {
+        console.error("Couldn't create a default area for the first room", err);
+        return;
+      }
+    }
+    if (!areaId) return;
+    setAddRoomAreaId(areaId);
+    setAddRoomOpen(true);
+  }
+
   function handlePlanButtonClick() {
     if ((areas?.length ?? 0) > 0) {
       const confirmed = window.confirm(
@@ -399,8 +428,9 @@ export function HizzelWorld({
       <div className="flex items-center gap-[5px] px-5 pb-2.5 lg:justify-end lg:gap-[7px] lg:px-9 lg:flex-row-reverse">
         <button
           type="button"
-          onClick={() => setAddRoomOpen(true)}
-          className="flex items-center gap-1 rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-3.5 py-[7px] text-[11px] font-medium whitespace-nowrap text-dark-tool-label"
+          onClick={handleAddRoomClick}
+          disabled={createArea.isPending}
+          className="flex items-center gap-1 rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-3.5 py-[7px] text-[11px] font-medium whitespace-nowrap text-dark-tool-label disabled:opacity-60"
         >
           <IconPlus size={12} /> Room
         </button>
@@ -573,8 +603,14 @@ export function HizzelWorld({
           AppShell as a fixed overlay spanning both worlds. */}
       <div className="h-[72px] shrink-0 lg:hidden" />
 
-      {addRoomOpen && selectedAreaId && (
-        <RoomFormSheet areaId={selectedAreaId} onClose={() => setAddRoomOpen(false)} />
+      {addRoomOpen && addRoomAreaId && (
+        <RoomFormSheet
+          areaId={addRoomAreaId}
+          onClose={() => {
+            setAddRoomOpen(false);
+            setAddRoomAreaId(undefined);
+          }}
+        />
       )}
       {editAreasOpen && newProperty && (
         <EditAreasSheet propertyId={newProperty.id} onClose={() => setEditAreasOpen(false)} />

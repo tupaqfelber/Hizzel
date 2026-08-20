@@ -12,6 +12,19 @@ const ROLE_GRADIENT = {
   new: "linear-gradient(135deg,#9BA89A,#8A9889)",
 } as const;
 
+// UK postcode, permissive: 1-2 letters + 1-2 digits + optional letter/digit,
+// a space (any amount, or none as typed), then a digit + 2 letters. Address
+// is one free-text field, not split into street/city/postcode, so this just
+// finds and reformats a postcode-shaped substring wherever it sits.
+const UK_POSTCODE_RE = /\b([a-z]{1,2}\d[a-z\d]?)\s*(\d[a-z]{2})\b/gi;
+
+function formatPostcode(address: string): string {
+  return address.replace(
+    UK_POSTCODE_RE,
+    (_match, outward: string, inward: string) => `${outward.toUpperCase()} ${inward.toUpperCase()}`,
+  );
+}
+
 export function PropertyFormSheet({
   property,
   onClose,
@@ -41,6 +54,10 @@ export function PropertyFormSheet({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!nickname.trim() && !address.trim()) {
+      setError("Enter a nickname or an address");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -107,15 +124,14 @@ export function PropertyFormSheet({
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
             placeholder="e.g. Bramshott"
-            required
           />
 
           <FieldLabel>Address</FieldLabel>
           <InputField
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder="e.g. Bramshott Cottage, South Harting, GU31 5NN"
-            required
+            onBlur={() => setAddress((a) => formatPostcode(a))}
+            placeholder="e.g. Bramshott Cottage, South Harting, gu31 5nn"
           />
 
           {error && <p className="mt-3 text-xs text-red-700">{error}</p>}
