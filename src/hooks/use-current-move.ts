@@ -128,6 +128,36 @@ interface PropertyInput {
   photoFile: File | null;
 }
 
+// `start_new_move` isn't in the generated Database type yet — it's created
+// by a migration (supabase/migrations/20260817130000_start_new_move.sql)
+// that hasn't been applied to the live project. Once it's applied,
+// regenerate src/lib/supabase/types.ts (`supabase gen types typescript
+// --linked`) and delete this interface + cast in favor of calling
+// supabase.rpc directly, same as every other hook in this codebase.
+interface StartNewMoveRpc {
+  rpc(fn: "start_new_move"): Promise<{ data: string | null; error: { message: string } | null }>;
+}
+
+export function useStartNewMove() {
+  const supabase = createClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await (supabase as unknown as StartNewMoveRpc).rpc("start_new_move");
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: () => {
+      // Every hook keyed on move?.id (useOtherMoves, useAreas,
+      // useGroupedThings, useMoveItems, ...) picks up the change on its own
+      // once this refetches and move.id changes — a query key change alone
+      // triggers a fresh fetch, no need to invalidate those individually.
+      queryClient.invalidateQueries({ queryKey: ["current-move"] });
+    },
+  });
+}
+
 export function useUpdateProperty() {
   const supabase = createClient();
   const queryClient = useQueryClient();

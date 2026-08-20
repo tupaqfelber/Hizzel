@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   useCurrentMove,
   useOtherMoves,
+  useStartNewMove,
   type MoveProperty,
   type CurrentMove,
 } from "@/hooks/use-current-move";
@@ -91,6 +92,8 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
     | { type: "move-details" }
     | null
   >(null);
+  const [newMoveError, setNewMoveError] = useState<string | null>(null);
+  const startNewMove = useStartNewMove();
 
   const current = move?.properties.find((p) => p.role === "current");
   const next = move?.properties.find((p) => p.role === "new");
@@ -99,6 +102,19 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   async function handleSignOut() {
     await supabase.auth.signOut();
     router.push("/login");
+  }
+
+  async function handleNewMoveClick() {
+    const confirmed = window.confirm(
+      "Starting a new move will archive your current one. You'll still see it listed, but won't be able to open or edit it.",
+    );
+    if (!confirmed) return;
+    setNewMoveError(null);
+    try {
+      await startNewMove.mutateAsync();
+    } catch (err) {
+      setNewMoveError(err instanceof Error ? err.message : "Couldn't start a new move");
+    }
   }
 
   return (
@@ -126,11 +142,23 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
               </div>
               <button
                 type="button"
-                className="flex items-center gap-1 rounded-full border border-dashed border-amber-ink/40 px-2.5 py-[5px] text-[10px] font-medium text-amber-ink/85"
+                onClick={handleNewMoveClick}
+                disabled={startNewMove.isPending}
+                className="flex items-center gap-1 rounded-full border border-dashed border-amber-ink/40 px-2.5 py-[5px] text-[10px] font-medium text-amber-ink/85 disabled:opacity-60"
               >
-                <IconPlus size={10} /> New move
+                <IconPlus size={10} /> {startNewMove.isPending ? "Creating…" : "New move"}
               </button>
             </div>
+
+            {newMoveError && (
+              <button
+                type="button"
+                onClick={() => setNewMoveError(null)}
+                className="mb-2.5 w-full rounded-[10px] bg-amber-ink/10 px-3.5 py-2 text-left text-[11px] text-amber-ink/85"
+              >
+                {newMoveError}
+              </button>
+            )}
 
             <h2 className="font-serif text-[22px] leading-[1.1] text-amber-ink">
               {current?.nickname ?? "?"} → {next?.nickname ?? "?"}
