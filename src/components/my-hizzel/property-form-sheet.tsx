@@ -58,10 +58,20 @@ export function PropertyFormSheet({
       setError("Enter a nickname or an address");
       return;
     }
+    // Also apply here, not just on blur — a tap straight from the address
+    // field to "Save Changes" (common on mobile, with a virtual keyboard
+    // still up) doesn't reliably fire blur first, so relying on blur alone
+    // could let a lowercase postcode slip through uncorrected.
+    const formattedAddress = formatPostcode(address);
     setSaving(true);
     setError(null);
     try {
-      await updateProperty.mutateAsync({ id: property.id, nickname, address, photoFile });
+      await updateProperty.mutateAsync({
+        id: property.id,
+        nickname,
+        address: formattedAddress,
+        photoFile,
+      });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
