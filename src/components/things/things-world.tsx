@@ -283,6 +283,13 @@ export function ThingsWorld({
       </div>
 
       <div className="mx-5 mb-3 flex items-center gap-2 lg:mx-9">
+        <button
+          type="button"
+          onClick={() => setSheetState({ mode: "add" })}
+          className="flex items-center gap-1 rounded-[10px] border-[0.5px] border-linen-ink/10 bg-linen-ink/[.07] px-3.5 py-[7px] text-[11px] font-medium whitespace-nowrap text-linen-ink-secondary"
+        >
+          <IconPlus size={12} /> Item
+        </button>
         <IconButton
           icon={IconSearch}
           label="Search"
@@ -337,15 +344,6 @@ export function ThingsWorld({
           </p>
         )}
       </div>
-
-      <button
-        type="button"
-        onClick={() => setSheetState({ mode: "add" })}
-        aria-label="Add a Thing"
-        className="absolute right-5 bottom-[82px] z-10 flex h-[42px] w-[42px] items-center justify-center rounded-full bg-linen-ink text-linen shadow-lg lg:right-auto lg:bottom-7 lg:left-9 lg:h-12 lg:w-12"
-      >
-        <IconPlus size={20} />
-      </button>
 
       {sheetState?.mode === "add" && (
         <ThingFormSheet onClose={() => setSheetState(null)} />
