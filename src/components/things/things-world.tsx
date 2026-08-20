@@ -288,7 +288,7 @@ export function ThingsWorld({
           onClick={() => setSheetState({ mode: "add" })}
           className="flex items-center gap-1 rounded-[10px] border-[0.5px] border-linen-ink/10 bg-linen-ink/[.07] px-3.5 py-[7px] text-[11px] font-medium whitespace-nowrap text-linen-ink-secondary"
         >
-          <IconPlus size={12} /> Item
+          <IconPlus size={12} /> Thing
         </button>
         <IconButton
           icon={IconSearch}
