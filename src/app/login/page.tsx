@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { IconMail, IconKey } from "@tabler/icons-react";
+import { usePostHog } from "posthog-js/react";
 import { createClient } from "@/lib/supabase/client";
 import { useAutoFocus } from "@/hooks/use-auto-focus";
 
@@ -12,6 +13,7 @@ type Step = "email" | "code";
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
+  const posthog = usePostHog();
 
   const [step, setStep] = useState<Step>("email");
   const emailInputRef = useAutoFocus<HTMLInputElement>();
@@ -38,7 +40,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       email,
       token: code,
       type: "email",
@@ -48,6 +50,7 @@ export default function LoginPage() {
       setError(error.message);
       return;
     }
+    if (data.user) posthog?.identify(data.user.id, { email: data.user.email });
     router.push("/welcome");
   }
 

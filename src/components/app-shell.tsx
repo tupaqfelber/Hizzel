@@ -5,7 +5,9 @@ import { ThingsWorld } from "@/components/things/things-world";
 import { HizzelWorld } from "@/components/hizzel/hizzel-world";
 import { HizzelMidPanel } from "@/components/hizzel/hizzel-mid-panel";
 import { MyHizzelOverlay } from "@/components/my-hizzel/my-hizzel-overlay";
+import { PaywallSheet } from "@/components/billing/paywall-sheet";
 import { useCurrentMove } from "@/hooks/use-current-move";
+import { useIdentifyUser } from "@/hooks/use-identify-user";
 
 const MOVE_THRESHOLD_PX = 5;
 const SNAP_DURATION_MS = 250;
@@ -24,6 +26,7 @@ function easeOutCubic(t: number) {
 }
 
 export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" }) {
+  useIdentifyUser();
   const { data: move } = useCurrentMove();
   const [myHizzelOpen, setMyHizzelOpen] = useState(false);
   const [position, setPosition] = useState(initialStop === "hizzel" ? 1 : 0);
@@ -190,6 +193,7 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" }) 
       )}
 
       {myHizzelOpen && <MyHizzelOverlay onClose={() => setMyHizzelOpen(false)} />}
+      <PaywallSheet />
     </div>
   );
 }
