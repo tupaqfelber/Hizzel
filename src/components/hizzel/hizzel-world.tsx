@@ -258,6 +258,13 @@ export function HizzelWorld({
           });
           posthog?.capture("item_placed", { roomId: room.id });
           useFlashStore.getState().flash(itemId);
+          // Same treatment as dropping a Things card in, and as tapping
+          // the item directly: whatever you just moved is the thing the
+          // toolbar (and Things' own list) should now point at, not
+          // whatever was selected before the drag started.
+          setSelectedItemId(itemId);
+          setSelectedRoomId(null);
+          useScrollToItemStore.getState().requestScroll(itemId);
           for (const bumped of placed.displaced) {
             const bumpedItem = roomItems.find((i) => i.id === bumped.id);
             if (!bumpedItem) continue;
