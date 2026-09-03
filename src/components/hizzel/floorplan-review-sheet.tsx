@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePostHog } from "posthog-js/react";
 import { IconTrash } from "@tabler/icons-react";
 import { Sheet, SheetBody, SheetFooter } from "@/components/ui/sheet";
 import { FieldLabel, InputField } from "@/components/ui/field";
@@ -44,6 +45,7 @@ export function FloorPlanReviewSheet({
   const [error, setError] = useState<string | null>(null);
 
   const importFloorPlan = useImportFloorPlan(moveId);
+  const posthog = usePostHog();
 
   function updateRoom(floorIndex: number, roomIndex: number, patch: Partial<ExtractedRoom>) {
     setFloors((prev) =>
@@ -75,6 +77,10 @@ export function FloorPlanReviewSheet({
         propertyId,
         replaceExisting: hasExistingPlan,
         floors,
+      });
+      posthog?.capture("floorplan_uploaded", {
+        floorCount: floors.length,
+        roomCount: floors.reduce((n, f) => n + f.rooms.length, 0),
       });
       onClose();
     } catch (err) {

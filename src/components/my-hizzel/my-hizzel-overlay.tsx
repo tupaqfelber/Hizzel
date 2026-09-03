@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePostHog } from "posthog-js/react";
 import {
   IconX,
   IconPlus,
@@ -22,6 +23,8 @@ import {
 } from "@/hooks/use-current-move";
 import { PropertyFormSheet } from "@/components/my-hizzel/property-form-sheet";
 import { MoveDetailsFormSheet } from "@/components/my-hizzel/move-details-form-sheet";
+import { useBillingStatus } from "@/hooks/use-billing-status";
+import { usePaywallStore } from "@/hooks/use-paywall-store";
 
 const ROLE_GRADIENT = {
   current: "linear-gradient(135deg,#C8A882,#B8986F)",
@@ -84,6 +87,7 @@ function PropertyCard({
 export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const supabase = createClient();
+  const posthog = usePostHog();
   const { data: move } = useCurrentMove();
   const { data: otherMoves } = useOtherMoves(move?.id);
 
@@ -94,6 +98,8 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   >(null);
   const [newMoveError, setNewMoveError] = useState<string | null>(null);
   const startNewMove = useStartNewMove();
+  const { hizzelUnlocked } = useBillingStatus();
+  const [portalLoading, setPortalLoading] = useState(false);
 
   const current = move?.properties.find((p) => p.role === "current");
   const next = move?.properties.find((p) => p.role === "new");
@@ -104,6 +110,22 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
     router.push("/login");
   }
 
+  async function handleSubscriptionClick() {
+    if (!hizzelUnlocked) {
+      usePaywallStore.getState().open();
+      return;
+    }
+    setPortalLoading(true);
+    try {
+      const res = await fetch("/api/stripe/portal", { method: "POST" });
+      const body = await res.json();
+      if (!res.ok || !body.url) throw new Error(body.error ?? "Couldn't open the billing portal");
+      window.location.href = body.url;
+    } catch {
+      setPortalLoading(false);
+    }
+  }
+
   async function handleNewMoveClick() {
     const confirmed = window.confirm(
       "Starting a new move will archive your current one. You'll still see it listed, but won't be able to open or edit it.",
@@ -112,6 +134,7 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
     setNewMoveError(null);
     try {
       await startNewMove.mutateAsync();
+      posthog?.capture("move_created");
     } catch (err) {
       setNewMoveError(err instanceof Error ? err.message : "Couldn't start a new move");
     }
@@ -248,8 +271,13 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
 
       <div className="flex h-[74px] shrink-0 items-center justify-center border-t border-amber-ink/15 pb-2.5">
         <div className="flex w-[280px] gap-0.5 rounded-full bg-linen-ink/35 p-[3px]">
-          <button type="button" className="flex-1 rounded-full py-2 text-center text-[11px] font-medium text-amber-ink/60">
-            Subscription
+          <button
+            type="button"
+            onClick={handleSubscriptionClick}
+            disabled={portalLoading}
+            className="flex-1 rounded-full py-2 text-center text-[11px] font-medium text-amber-ink/60 disabled:opacity-60"
+          >
+            {portalLoading ? "Opening…" : "Subscription"}
           </button>
           <a
             href="mailto:hello@hizzel.com"

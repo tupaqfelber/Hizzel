@@ -13,11 +13,14 @@ import {
   IconPencil,
   IconX,
 } from "@tabler/icons-react";
+import { usePostHog } from "posthog-js/react";
 import { useCurrentMove } from "@/hooks/use-current-move";
 import { useAreas, useUpdateArea, useCreateArea } from "@/hooks/use-areas";
 import { useRooms, useUpdateRoomPosition, useUpdateRoom } from "@/hooks/use-rooms";
 import { useMoveItems, usePlaceItem } from "@/hooks/use-move-items";
 import { useFlashStore } from "@/hooks/use-flash-store";
+import { useBillingStatus } from "@/hooks/use-billing-status";
+import { usePaywallStore } from "@/hooks/use-paywall-store";
 import { categoryFlashColor } from "@/lib/category-colors";
 import { computeCanvasScale } from "@/lib/canvas-scale";
 import { rotatedFootprint, resolvePlacement } from "@/lib/item-snap";
@@ -87,6 +90,8 @@ export function HizzelWorld({
   const { data: items } = useMoveItems(move?.id);
   const placeItem = usePlaceItem(move?.id);
   const flashingIds = useFlashStore((s) => s.flashingIds);
+  const { hizzelUnlocked } = useBillingStatus();
+  const posthog = usePostHog();
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
@@ -175,7 +180,13 @@ export function HizzelWorld({
       const roomEl = el?.closest("[data-room-id]") as HTMLElement | null;
       const room = roomEl && rooms?.find((r) => r.id === roomEl.dataset.roomId);
 
-      if (roomEl && room) {
+      if (roomEl && room && !hizzelUnlocked) {
+        // Gate the whole "dropped on a room" case here, before ever
+        // checking fit — gating only the fits branch would let an
+        // oversized item silently bounce to the tray with zero indication
+        // Hizzel is locked at all.
+        usePaywallStore.getState().open();
+      } else if (roomEl && room) {
         const roomRect = roomEl.getBoundingClientRect();
         const localXcm = (ev.clientX - roomRect.left) / scale.pxPerCm;
         const localYcm = (ev.clientY - roomRect.top) / scale.pxPerCm;
@@ -210,6 +221,7 @@ export function HizzelWorld({
             y_cm: placed.y,
             rotation_deg: draggedItem.rotation_deg,
           });
+          posthog?.capture("item_placed", { roomId: room.id });
           useFlashStore.getState().flash(itemId);
           for (const bumped of placed.displaced) {
             const bumpedItem = roomItems.find((i) => i.id === bumped.id);
@@ -255,6 +267,10 @@ export function HizzelWorld({
   function handleRotate(itemId: string) {
     const item = items?.find((i) => i.id === itemId);
     if (!item || item.x_cm == null || item.y_cm == null || !item.roomId) return;
+    if (!hizzelUnlocked) {
+      usePaywallStore.getState().open();
+      return;
+    }
     const room = rooms?.find((r) => r.id === item.roomId);
     if (!room) return;
 
@@ -312,6 +328,10 @@ export function HizzelWorld({
   // not a placement engine; if it overlaps afterward, dragging already
   // handles nudging rooms apart.
   function handleRotateRoom(roomId: string) {
+    if (!hizzelUnlocked) {
+      usePaywallStore.getState().open();
+      return;
+    }
     const room = rooms?.find((r) => r.id === roomId);
     if (!room) return;
     updateRoom.mutate({ id: room.id, width_cm: room.depth_cm, depth_cm: room.width_cm });
@@ -352,6 +372,10 @@ export function HizzelWorld({
   // transparently creates a first area on demand so the button always
   // works, matching "the clear, obvious path for anyone without a plan".
   async function handleAddRoomClick() {
+    if (!hizzelUnlocked) {
+      usePaywallStore.getState().open();
+      return;
+    }
     let areaId = selectedAreaId;
     if (!areaId && newProperty?.id) {
       try {
@@ -368,6 +392,10 @@ export function HizzelWorld({
   }
 
   function handlePlanButtonClick() {
+    if (!hizzelUnlocked) {
+      usePaywallStore.getState().open();
+      return;
+    }
     if ((areas?.length ?? 0) > 0) {
       const confirmed = window.confirm(
         "Uploading a new plan will delete your existing floor plan — all its areas and rooms will be removed, and anything placed in them returned to the tray. Continue?",
@@ -417,6 +445,10 @@ export function HizzelWorld({
                 }}
                 onEditAreas={() => {
                   setAreaDropdownOpen(false);
+                  if (!hizzelUnlocked) {
+                    usePaywallStore.getState().open();
+                    return;
+                  }
                   setEditAreasOpen(true);
                 }}
               />
@@ -451,10 +483,14 @@ export function HizzelWorld({
         />
         <button
           type="button"
-          onClick={() =>
-            selectedArea &&
-            updateArea.mutate({ id: selectedArea.id, is_locked: !selectedArea.is_locked })
-          }
+          onClick={() => {
+            if (!selectedArea) return;
+            if (!hizzelUnlocked) {
+              usePaywallStore.getState().open();
+              return;
+            }
+            updateArea.mutate({ id: selectedArea.id, is_locked: !selectedArea.is_locked });
+          }}
           aria-label={selectedArea?.is_locked ? "Unlock area" : "Lock area"}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] text-dark-tool-label"
         >
@@ -490,7 +526,13 @@ export function HizzelWorld({
               type="button"
               onClick={() => {
                 if (selectedItem) setEditingItemId(selectedItem.id);
-                else if (selectedRoom) setEditingRoomId(selectedRoom.id);
+                else if (selectedRoom) {
+                  if (!hizzelUnlocked) {
+                    usePaywallStore.getState().open();
+                    return;
+                  }
+                  setEditingRoomId(selectedRoom.id);
+                }
               }}
               aria-label="Edit"
               className="flex h-6 w-6 shrink-0 items-center justify-center text-dark-tool-label"
@@ -550,6 +592,8 @@ export function HizzelWorld({
             room={room}
             scale={scale}
             locked={!!selectedArea?.is_locked}
+            billingLocked={!hizzelUnlocked}
+            onBillingLockedAttempt={() => usePaywallStore.getState().open()}
             selected={selectedRoomId === room.id}
             otherRooms={rooms.filter((r) => r.id !== room.id)}
             onDragEnd={(x, y) => updateRoomPosition.mutate({ id: room.id, canvas_x: x, canvas_y: y })}

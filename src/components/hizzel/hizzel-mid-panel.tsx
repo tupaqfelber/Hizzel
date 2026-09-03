@@ -8,6 +8,8 @@ import { useAreas, useCreateArea } from "@/hooks/use-areas";
 import { useRooms } from "@/hooks/use-rooms";
 import { useMoveItems, type MoveItem } from "@/hooks/use-move-items";
 import { useFlashStore } from "@/hooks/use-flash-store";
+import { useBillingStatus } from "@/hooks/use-billing-status";
+import { usePaywallStore } from "@/hooks/use-paywall-store";
 import { computeCanvasScale, cmToPx } from "@/lib/canvas-scale";
 import { rotatedFootprint } from "@/lib/item-snap";
 import { CATEGORY_COLORS, categoryFlashColor } from "@/lib/category-colors";
@@ -39,6 +41,7 @@ export function HizzelMidPanel({
   const { data: rooms } = useRooms(area?.id);
   const { data: items } = useMoveItems(move?.id);
   const flashingIds = useFlashStore((s) => s.flashingIds);
+  const { hizzelUnlocked } = useBillingStatus();
   const createArea = useCreateArea(newProperty?.id);
   const [addRoomOpen, setAddRoomOpen] = useState(false);
   // Same reasoning as HizzelWorld: `area` (areas?.[0]) is undefined with
@@ -69,6 +72,10 @@ export function HizzelMidPanel({
   }
 
   async function handleAddRoomClick() {
+    if (!hizzelUnlocked) {
+      usePaywallStore.getState().open();
+      return;
+    }
     let areaId = area?.id;
     if (!areaId && newProperty?.id) {
       try {
@@ -84,6 +91,10 @@ export function HizzelMidPanel({
   }
 
   function handlePlanButtonClick() {
+    if (!hizzelUnlocked) {
+      usePaywallStore.getState().open();
+      return;
+    }
     if ((areas?.length ?? 0) > 0) {
       const confirmed = window.confirm(
         "Uploading a new plan will delete your existing floor plan — all its areas and rooms will be removed, and anything placed in them returned to the tray. Continue?",

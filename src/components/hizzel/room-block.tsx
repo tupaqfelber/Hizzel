@@ -12,6 +12,8 @@ export function RoomBlock({
   room,
   scale,
   locked,
+  billingLocked,
+  onBillingLockedAttempt,
   selected,
   otherRooms,
   onDragEnd,
@@ -21,6 +23,8 @@ export function RoomBlock({
   room: RoomRow;
   scale: CanvasScale;
   locked: boolean;
+  billingLocked?: boolean;
+  onBillingLockedAttempt?: () => void;
   selected: boolean;
   otherRooms: RoomRow[];
   onDragEnd: (x_cm: number, y_cm: number) => void;
@@ -59,6 +63,12 @@ export function RoomBlock({
     const dyPx = e.clientY - dragState.current.startClientY;
     if (Math.hypot(dxPx, dyPx) > MOVE_THRESHOLD_PX) dragState.current.moved = true;
 
+    // Tap-to-select (the !moved branch in handlePointerUp) still needs to
+    // work while billing-locked — harmless, view-only. Only an actual drag
+    // attempt is blocked: the room just doesn't visually move, and release
+    // opens the paywall instead of committing a position change.
+    if (billingLocked) return;
+
     const dxCm = dxPx / scale.pxPerCm;
     const dyCm = dyPx / scale.pxPerCm;
     const rawX = dragState.current.startCmX + dxCm;
@@ -79,6 +89,10 @@ export function RoomBlock({
 
     if (!moved) {
       onSelect();
+      return;
+    }
+    if (billingLocked) {
+      onBillingLockedAttempt?.();
       return;
     }
     if (pendingX !== undefined && pendingY !== undefined) {

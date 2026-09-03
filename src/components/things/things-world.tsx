@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import { usePostHog } from "posthog-js/react";
 import { useAutoFocus } from "@/hooks/use-auto-focus";
 import { IconSearch, IconPlus } from "@tabler/icons-react";
 import { IconButton } from "@/components/ui/icon-button";
@@ -14,6 +15,8 @@ import { useCurrentMove } from "@/hooks/use-current-move";
 import { useGroupedThings, useSendToTray, UNASSIGNED, type ThingItem } from "@/hooks/use-things";
 import { useMoveItems, usePlaceItem } from "@/hooks/use-move-items";
 import { useFlashStore } from "@/hooks/use-flash-store";
+import { useBillingStatus } from "@/hooks/use-billing-status";
+import { usePaywallStore } from "@/hooks/use-paywall-store";
 import { rotatedFootprint, resolvePlacement } from "@/lib/item-snap";
 import type { ThingCategory } from "@/lib/supabase/types";
 
@@ -60,6 +63,8 @@ export function ThingsWorld({
 
   const { data: moveItems } = useMoveItems(move?.id);
   const placeItem = usePlaceItem(move?.id);
+  const { hizzelUnlocked } = useBillingStatus();
+  const posthog = usePostHog();
 
   const currentProperty = move?.properties?.find((p) => p.role === "current");
 
@@ -152,7 +157,13 @@ export function ThingsWorld({
       // arrow button, just via drag instead of tap.
       const inUnassignedZone = !!el?.closest("[data-unassigned-zone]");
 
-      if (draggedItem && roomEl) {
+      if (draggedItem && roomEl && !hizzelUnlocked) {
+        // Gate the whole "dropped on a room" case before ever checking fit
+        // — same reasoning as hizzel-world.tsx's startDrag: gating only the
+        // fits branch would let an oversized item silently bounce to the
+        // tray with zero indication Hizzel is locked at all.
+        usePaywallStore.getState().open();
+      } else if (draggedItem && roomEl) {
         const roomId = roomEl.dataset.roomId!;
         const widthCm = Number(roomEl.dataset.widthCm);
         const depthCm = Number(roomEl.dataset.depthCm);
@@ -199,6 +210,7 @@ export function ThingsWorld({
             y_cm: placed.y,
             rotation_deg: draggedItem.rotation_deg,
           });
+          posthog?.capture("item_placed", { roomId });
           useFlashStore.getState().flash(thing.id);
           if (inMidZone) onJumpToHizzel();
           for (const bumped of placed.displaced) {

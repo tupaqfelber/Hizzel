@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePostHog } from "posthog-js/react";
 import { Sheet, SheetBody, SheetFooter } from "@/components/ui/sheet";
 import { FieldLabel, InputField } from "@/components/ui/field";
 import { GhostButton, SolidButton } from "@/components/ui/button";
@@ -31,6 +32,7 @@ export function RoomFormSheet({
   const createRoom = useCreateRoom(areaId);
   const updateRoom = useUpdateRoom();
   const deleteRoom = useDeleteRoom(areaId, moveId);
+  const posthog = usePostHog();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,6 +53,7 @@ export function RoomFormSheet({
           width_cm: Number(width),
           depth_cm: Number(depth),
         });
+        posthog?.capture("room_created");
       }
       onClose();
     } catch (err) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { usePostHog } from "posthog-js/react";
 import { IconCamera, IconPhoto } from "@tabler/icons-react";
 import { Sheet, SheetBody, SheetFooter } from "@/components/ui/sheet";
 import { Pill } from "@/components/ui/pill";
@@ -50,6 +51,7 @@ export function ThingFormSheet({
   const createThing = useCreateThing();
   const updateThing = useUpdateThing();
   const deleteThing = useDeleteThing();
+  const posthog = usePostHog();
 
   const CategoryIcon = CATEGORY_ICONS[category];
   const categoryColor = CATEGORY_COLORS[category];
@@ -90,6 +92,7 @@ export function ThingFormSheet({
         await updateThing.mutateAsync({ id: thing.id, ...input });
       } else {
         await createThing.mutateAsync(input);
+        posthog?.capture("thing_created", { category: input.category });
       }
       onClose();
     } catch (err) {
