@@ -20,6 +20,7 @@ import { useRooms, useUpdateRoomPosition, useUpdateRoom } from "@/hooks/use-room
 import { useMoveItems, usePlaceItem } from "@/hooks/use-move-items";
 import { useFlashStore } from "@/hooks/use-flash-store";
 import { useScrollToItemStore } from "@/hooks/use-scroll-to-item-store";
+import { useSelectItemStore } from "@/hooks/use-select-item-store";
 import { useBillingStatus } from "@/hooks/use-billing-status";
 import { usePaywallStore } from "@/hooks/use-paywall-store";
 import { CATEGORY_COLORS, categoryFlashColor } from "@/lib/category-colors";
@@ -75,6 +76,28 @@ export function HizzelWorld({
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
+
+  // A Things card dropped straight into a room (things-world.tsx's own
+  // cross-world drag) should land in the toolbar exactly as if it had been
+  // tapped here directly — otherwise the top bar keeps showing whatever
+  // was selected before, even though the item you just placed is the one
+  // that matters now. Subscribed directly (not via the useX(selector) +
+  // effect-on-value combo) so the setState call happens inside the
+  // subscription callback, not synchronously in the effect body itself —
+  // this fires on every request even for the same id repeated back to
+  // back, since useSelectItemStore.requestSelect always produces a new
+  // state object.
+  useEffect(() => {
+    return useSelectItemStore.subscribe((state) => {
+      if (!state.itemId) return;
+      setSelectedItemId(state.itemId);
+      setSelectedRoomId(null);
+      // No flash() call here — things-world.tsx's own successful-placement
+      // branch already flashes this id (flashingIds is global, so it
+      // lights up this item's block here too), and the toolbar's flash
+      // reads that same shared state once selectedItemId matches it.
+    });
+  }, []);
 
   // Default to the first area once loaded, without a setState-in-effect.
   const selectedAreaId =

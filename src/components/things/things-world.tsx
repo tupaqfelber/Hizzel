@@ -16,6 +16,7 @@ import { useGroupedThings, useSendToTray, UNASSIGNED, type ThingItem } from "@/h
 import { useMoveItems, usePlaceItem } from "@/hooks/use-move-items";
 import { useFlashStore } from "@/hooks/use-flash-store";
 import { useScrollToItemStore } from "@/hooks/use-scroll-to-item-store";
+import { useSelectItemStore } from "@/hooks/use-select-item-store";
 import { useBillingStatus } from "@/hooks/use-billing-status";
 import { usePaywallStore } from "@/hooks/use-paywall-store";
 import { rotatedFootprint, resolvePlacement } from "@/lib/item-snap";
@@ -240,6 +241,11 @@ export function ThingsWorld({
           });
           posthog?.capture("item_placed", { roomId });
           useFlashStore.getState().flash(thing.id);
+          // The item you just dropped into a room should be the one
+          // showing (and flashing) in Hizzel's own toolbar too, exactly
+          // as if you'd tapped it there directly — not whatever was
+          // selected before, or nothing.
+          useSelectItemStore.getState().requestSelect(thing.id);
           if (inMidZone) onJumpToHizzel();
           for (const bumped of placed.displaced) {
             const bumpedItem = roomItems.find((i) => i.id === bumped.id);
