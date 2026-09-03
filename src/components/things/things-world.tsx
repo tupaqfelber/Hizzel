@@ -43,9 +43,18 @@ const CATEGORIES: ThingCategory[] = [
 export function ThingsWorld({
   widthPx,
   onJumpToHizzel,
+  onDragStart,
 }: {
   widthPx: number;
   onJumpToHizzel: () => void;
+  // Called the moment a card drag actually starts moving (not on a plain
+  // tap). On mobile, sitting fully at the "Things" stop leaves no room to
+  // drop onto at all — the Mid panel's thumbnail is still in the DOM there,
+  // but shrunk to 0 width with pointer-events disabled, so it can never be
+  // an elementFromPoint hit. AppShell uses this to auto-reveal the Mid
+  // split the instant a drag begins, the same way a successful placement
+  // already auto-jumps to full Hizzel below.
+  onDragStart?: () => void;
 }) {
   const { data: move } = useCurrentMove();
   const { data } = useGroupedThings(move?.id);
@@ -102,7 +111,10 @@ export function ThingsWorld({
     function handleMove(ev: PointerEvent) {
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
-      if (Math.hypot(dx, dy) > 5) moved = true;
+      if (Math.hypot(dx, dy) > 5 && !moved) {
+        moved = true;
+        onDragStart?.();
+      }
       setCardDrag((d) => (d ? { ...d, clientX: ev.clientX, clientY: ev.clientY } : d));
 
       const el = document.elementFromPoint(ev.clientX, ev.clientY);

@@ -114,7 +114,19 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" }) 
 
   return (
     <div className="relative flex h-dvh w-dvw overflow-hidden">
-      <ThingsWorld widthPx={thingsWidthPx} onJumpToHizzel={() => animateTo(1)} />
+      <ThingsWorld
+        widthPx={thingsWidthPx}
+        onJumpToHizzel={() => animateTo(1)}
+        // At the full "Things" stop the Mid panel's room thumbnails are
+        // still in the DOM but zero-width and pointer-events-none, so a
+        // card drag has no room to land on at all. Reveal the Mid split
+        // the instant a drag actually starts so there's always a drop
+        // target — a no-op on desktop, where position is ignored in favor
+        // of the fixed 50/50 layout.
+        onDragStart={() => {
+          if (stop === 0) animateTo(0.5);
+        }}
+      />
       <HizzelWorld widthPx={hizzelWidthPx} mobileActive={stop === 1} />
       <HizzelMidPanel
         widthPx={hizzelWidthPx}
