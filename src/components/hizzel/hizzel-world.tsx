@@ -19,9 +19,10 @@ import { useAreas, useUpdateArea, useCreateArea } from "@/hooks/use-areas";
 import { useRooms, useUpdateRoomPosition, useUpdateRoom } from "@/hooks/use-rooms";
 import { useMoveItems, usePlaceItem } from "@/hooks/use-move-items";
 import { useFlashStore } from "@/hooks/use-flash-store";
+import { useScrollToItemStore } from "@/hooks/use-scroll-to-item-store";
 import { useBillingStatus } from "@/hooks/use-billing-status";
 import { usePaywallStore } from "@/hooks/use-paywall-store";
-import { categoryFlashColor } from "@/lib/category-colors";
+import { CATEGORY_COLORS, categoryFlashColor } from "@/lib/category-colors";
 import { computeCanvasScale } from "@/lib/canvas-scale";
 import { rotatedFootprint, resolvePlacement } from "@/lib/item-snap";
 import { RoomBlock } from "@/components/hizzel/room-block";
@@ -158,14 +159,25 @@ export function HizzelWorld({
       window.removeEventListener("pointerup", handleUp);
 
       if (!moved) {
-        setSelectedItemId((curr) => {
-          const next = curr === itemId ? null : itemId;
+        // Read (not a functional updater) — calling other stores' setState
+        // from inside a setSelectedItemId updater callback previously threw
+        // "Cannot update a component while rendering a different component"
+        // (React treats functional updaters as part of the render phase).
+        const next = selectedItemId === itemId ? null : itemId;
+        setSelectedItemId(next);
+        if (next) {
           // Flash the toolbar's new content on select, not deselect — a
           // packed room can make it unclear which item was actually hit,
           // so this confirms the tap registered and which one it landed on.
-          if (next) useFlashStore.getState().flash(next);
-          return next;
-        });
+          useFlashStore.getState().flash(next);
+          // Mirror the selection into Things — flash + scroll that item's
+          // own card into view there too, so the connection between the
+          // two views is obvious. Only ever reachable with Things visible
+          // on screen at the same time: on mobile this selection only
+          // happens in the full-Hizzel stop (Things at 0 width), and the
+          // Mid thumbnail isn't tappable at all.
+          useScrollToItemStore.getState().requestScroll(next);
+        }
         setDrag(null);
         return;
       }
@@ -348,6 +360,11 @@ export function HizzelWorld({
   const selectedFlashColor = selectedItem
     ? categoryFlashColor(selectedItem.category)
     : "rgba(220, 215, 205, 0.55)";
+  // The toolbar keeps the item's own colour for as long as it stays
+  // selected (not just the initial flash) — a room has no category colour
+  // of its own, so it keeps the plain neutral toolbar background.
+  const selectedItemBold = selectedItem ? CATEGORY_COLORS[selectedItem.category].bold : null;
+  const toolbarLabelClass = selectedItemBold ? "text-white/85" : "text-dark-tool-label";
 
   async function handlePlanFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -502,14 +519,15 @@ export function HizzelWorld({
             rotate, edit, name, close reads the same way on both. */}
         {hasSelection && (
           <div
-            className={`flex items-center gap-1 rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-2 py-[5px] ${
-              selectedFlashing ? "animate-item-flash" : ""
-            }`}
-            style={
-              selectedFlashing
+            className={`flex items-center gap-1 rounded-[10px] border-[0.5px] border-dark-ink/10 px-2 py-[5px] ${
+              selectedItemBold ? "" : "bg-dark-ink/[.07]"
+            } ${selectedFlashing ? "animate-item-flash" : ""}`}
+            style={{
+              ...(selectedItemBold ? { backgroundColor: selectedItemBold } : {}),
+              ...(selectedFlashing
                 ? ({ "--flash-color": selectedFlashColor } as React.CSSProperties)
-                : undefined
-            }
+                : {}),
+            }}
           >
             <button
               type="button"
@@ -518,7 +536,7 @@ export function HizzelWorld({
                 else if (selectedRoom) handleRotateRoom(selectedRoom.id);
               }}
               aria-label="Rotate"
-              className="flex h-6 w-6 shrink-0 items-center justify-center text-dark-tool-label"
+              className={`flex h-6 w-6 shrink-0 items-center justify-center ${toolbarLabelClass}`}
             >
               <IconRotate size={13} />
             </button>
@@ -535,11 +553,13 @@ export function HizzelWorld({
                 }
               }}
               aria-label="Edit"
-              className="flex h-6 w-6 shrink-0 items-center justify-center text-dark-tool-label"
+              className={`flex h-6 w-6 shrink-0 items-center justify-center ${toolbarLabelClass}`}
             >
               <IconPencil size={13} />
             </button>
-            <span className="max-w-[88px] truncate text-[11px] font-medium whitespace-nowrap text-dark-tool-label lg:max-w-[160px]">
+            <span
+              className={`max-w-[88px] truncate text-[11px] font-medium whitespace-nowrap lg:max-w-[160px] ${toolbarLabelClass}`}
+            >
               {selectedItem?.name ?? selectedRoom?.name}
             </span>
             <button
@@ -549,7 +569,7 @@ export function HizzelWorld({
                 setSelectedRoomId(null);
               }}
               aria-label="Deselect"
-              className="flex h-6 w-6 shrink-0 items-center justify-center text-dark-tool-label"
+              className={`flex h-6 w-6 shrink-0 items-center justify-center ${toolbarLabelClass}`}
             >
               <IconX size={13} />
             </button>

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePostHog } from "posthog-js/react";
 import { useAutoFocus } from "@/hooks/use-auto-focus";
 import { IconSearch, IconPlus } from "@tabler/icons-react";
@@ -15,6 +15,7 @@ import { useCurrentMove } from "@/hooks/use-current-move";
 import { useGroupedThings, useSendToTray, UNASSIGNED, type ThingItem } from "@/hooks/use-things";
 import { useMoveItems, usePlaceItem } from "@/hooks/use-move-items";
 import { useFlashStore } from "@/hooks/use-flash-store";
+import { useScrollToItemStore } from "@/hooks/use-scroll-to-item-store";
 import { useBillingStatus } from "@/hooks/use-billing-status";
 import { usePaywallStore } from "@/hooks/use-paywall-store";
 import { rotatedFootprint, resolvePlacement } from "@/lib/item-snap";
@@ -74,6 +75,21 @@ export function ThingsWorld({
   const placeItem = usePlaceItem(move?.id);
   const { hizzelUnlocked } = useBillingStatus();
   const posthog = usePostHog();
+
+  // Selecting an item in Hizzel's canvas requests a scroll here (the flash
+  // itself needs no extra wiring — ItemCard already reacts to the same
+  // useFlashStore id that selection flashes). Only reachable with this
+  // panel actually on screen: on mobile, item selection only happens in
+  // the full-Hizzel stop, where this panel is 0-width anyway.
+  const scrollToItemId = useScrollToItemStore((s) => s.itemId);
+  const scrollToItemNonce = useScrollToItemStore((s) => s.nonce);
+  useEffect(() => {
+    if (!scrollToItemId) return;
+    document
+      .querySelector(`[data-thing-id="${scrollToItemId}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollToItemNonce]);
 
   const currentProperty = move?.properties?.find((p) => p.role === "current");
 

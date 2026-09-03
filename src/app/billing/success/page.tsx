@@ -5,8 +5,8 @@ export default function BillingSuccessPage() {
     <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-linen px-8 text-center">
       <h1 className="font-serif text-2xl text-linen-ink">You&rsquo;re all set</h1>
       <p className="max-w-xs text-sm text-linen-ink-secondary">
-        Hizzel is unlocking now — this can take a few seconds to reflect. Head back in and
-        start placing rooms.
+        Your new Hizzel plan is unlocking now. This can take a few seconds. Head back in
+        and start planning the move to your new home.
       </p>
       <Link
         href="/"

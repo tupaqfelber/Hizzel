@@ -118,7 +118,9 @@ export function RoomBlock({
       } ${selected ? "ring-2 ring-dark-ink ring-offset-1 ring-offset-dark" : ""}`}
       style={{ left, top, width, height }}
     >
-      <div className="absolute top-[3px] left-1 z-[4] truncate text-[6px] font-medium tracking-[0.06em] text-[rgba(220,215,205,0.4)] uppercase">
+      {/* Sized/coloured to match item labels (ItemBlock) — was 6px at 40%
+          opacity, illegible next to items sitting right on top of it. */}
+      <div className="absolute top-[3px] left-1 z-[4] truncate text-[8px] font-medium tracking-[0.06em] text-white/85 uppercase lg:text-xs">
         {room.name}
       </div>
       {children}

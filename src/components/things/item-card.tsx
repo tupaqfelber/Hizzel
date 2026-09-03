@@ -1,6 +1,7 @@
 import { IconArrowRight } from "@tabler/icons-react";
-import { CATEGORY_COLORS } from "@/lib/category-colors";
+import { CATEGORY_COLORS, categoryFlashColor } from "@/lib/category-colors";
 import { CATEGORY_ICONS } from "@/lib/category-icons";
+import { useFlashStore } from "@/hooks/use-flash-store";
 import type { ThingItem } from "@/hooks/use-things";
 
 export function ItemCard({
@@ -16,11 +17,14 @@ export function ItemCard({
 }) {
   const Icon = CATEGORY_ICONS[thing.category];
   const color = CATEGORY_COLORS[thing.category];
+  const flashing = useFlashStore((s) => s.flashingIds.has(thing.id));
 
   return (
     <div
+      data-thing-id={thing.id}
       onPointerDown={onPointerDown}
-      className={`relative touch-none overflow-hidden rounded-[10px] bg-linen-card ${dragging ? "opacity-30" : ""}`}
+      className={`relative touch-none overflow-hidden rounded-[10px] bg-linen-card ${dragging ? "opacity-30" : ""} ${flashing ? "animate-item-flash" : ""}`}
+      style={{ "--flash-color": categoryFlashColor(thing.category) } as React.CSSProperties}
     >
       <div className="block w-full text-left">
         <div

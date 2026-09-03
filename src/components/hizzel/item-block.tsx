@@ -1,5 +1,6 @@
 "use client";
 
+import { useLayoutEffect, useRef, useState } from "react";
 import { CATEGORY_COLORS, categoryFlashColor } from "@/lib/category-colors";
 import { rotatedFootprint } from "@/lib/item-snap";
 import { cmToPx, type CanvasScale } from "@/lib/canvas-scale";
@@ -30,6 +31,24 @@ export function ItemBlock({
   const color = CATEGORY_COLORS[item.category].bold;
   const flashing = useFlashStore((s) => s.flashingIds.has(item.id));
 
+  // Item names are never abbreviated — a name that doesn't fit at the
+  // block's true-to-scale size is hidden entirely rather than shown
+  // truncated, since a partial name reads worse than none. The full name
+  // is always reachable by tapping the item (the toolbar above shows it).
+  // Measured post-layout rather than estimated, so it stays correct across
+  // every room size/zoom without duplicating the mobile/desktop font-size
+  // breakpoint in JS. `invisible` (not unmounting) keeps the span
+  // measurable so it can reappear the moment the block is big enough to
+  // hold it again.
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const [labelFits, setLabelFits] = useState(true);
+
+  useLayoutEffect(() => {
+    const el = labelRef.current;
+    if (!el) return;
+    setLabelFits(el.scrollWidth <= el.clientWidth);
+  }, [item.name, width, height]);
+
   return (
     <div
       data-item-id={item.id}
@@ -52,7 +71,12 @@ export function ItemBlock({
         } as React.CSSProperties
       }
     >
-      <span className="min-w-0 max-w-full truncate text-[8px] font-medium text-white/85 lg:text-xs">
+      <span
+        ref={labelRef}
+        className={`min-w-0 max-w-full overflow-hidden text-[8px] font-medium whitespace-nowrap text-white/85 lg:text-xs ${
+          labelFits ? "" : "invisible"
+        }`}
+      >
         {item.name}
       </span>
     </div>
