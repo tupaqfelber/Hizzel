@@ -12,6 +12,11 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // api/stripe/webhook is excluded — it's called directly by Stripe's
+    // servers with no Supabase session at all (verified instead via the
+    // signature header), so the auth gate would redirect it to /login
+    // before the route's own signature check ever ran. Confirmed via
+    // `stripe listen` logging every event as a 307 until this was added.
+    "/((?!_next/static|_next/image|favicon.ico|api/stripe/webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
