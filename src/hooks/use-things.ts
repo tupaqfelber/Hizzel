@@ -29,6 +29,12 @@ export interface ThingGroup {
   // per-group rather than looked up by room/area name afterwards, since
   // room names aren't unique across floors either.
   areaSortOrder: number;
+  // Null for Unassigned. Lets a group's own heading act as a drop target
+  // in ThingsWorld's cross-room drag — dropping there needs the room's
+  // real dimensions to run the same fit-check/collision logic a canvas
+  // drop does, even though there's no on-screen position to derive from.
+  roomWidthCm: number | null;
+  roomDepthCm: number | null;
   items: ThingItem[];
 }
 
@@ -70,7 +76,7 @@ export function useGroupedThings(moveId: string | undefined) {
           .order("name"),
         supabase
           .from("placements")
-          .select("thing_id, room_id, rooms(name, areas(name, sort_order))")
+          .select("thing_id, room_id, rooms(name, width_cm, depth_cm, areas(name, sort_order))")
           .eq("move_id", moveId!),
       ]);
 
@@ -89,6 +95,8 @@ export function useGroupedThings(moveId: string | undefined) {
         const roomName = roomId ? (placement?.rooms?.name ?? UNASSIGNED) : UNASSIGNED;
         const areaName = roomId ? (placement?.rooms?.areas?.name ?? null) : null;
         const areaSortOrder = roomId ? (placement?.rooms?.areas?.sort_order ?? 0) : 0;
+        const roomWidthCm = roomId ? (placement?.rooms?.width_cm ?? null) : null;
+        const roomDepthCm = roomId ? (placement?.rooms?.depth_cm ?? null) : null;
 
         if (!groupsByKey.has(key)) {
           groupsByKey.set(key, {
@@ -96,6 +104,8 @@ export function useGroupedThings(moveId: string | undefined) {
             roomName,
             areaName,
             areaSortOrder,
+            roomWidthCm,
+            roomDepthCm,
             items: [],
           });
         }

@@ -345,7 +345,22 @@ export function ThingsWorld({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[90px] [scrollbar-width:none] lg:px-9 lg:pb-10">
         {groups.map((group) => (
-          <div key={group.key} data-unassigned-zone={group.roomName === UNASSIGNED ? "" : undefined}>
+          <div
+            key={group.key}
+            data-unassigned-zone={group.roomName === UNASSIGNED ? "" : undefined}
+            // Same three data attributes RoomBlock and the Mid panel
+            // thumbnail carry — makes a room's own section in this list a
+            // real drop target, running through the exact same
+            // elementFromPoint hit-test and resolvePlacement pipeline a
+            // canvas drop does (no separate "list drop" logic to keep in
+            // sync). The resulting x/y is derived from wherever in this
+            // (arbitrarily-sized) section the pointer happened to land,
+            // same as it already is for the thumbnail's own non-1:1 scale
+            // — clamped into the room by resolvePlacement either way.
+            data-room-id={group.roomWidthCm != null ? group.key : undefined}
+            data-width-cm={group.roomWidthCm ?? undefined}
+            data-depth-cm={group.roomDepthCm ?? undefined}
+          >
             <div className="pt-2.5 pb-2 text-[10px] font-medium tracking-[0.1em] text-linen-ink-tertiary uppercase lg:text-xs">
               {/* Two same-named rooms on different floors ("Landing",
                   "Shower Room") would otherwise look identical here — the
