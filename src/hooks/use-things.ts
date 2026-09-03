@@ -16,7 +16,19 @@ export interface ThingItem {
 }
 
 export interface ThingGroup {
+  // Grouping key: the room's own id, or the UNASSIGNED sentinel. Never the
+  // room's name alone — a multi-floor property routinely has same-named
+  // rooms on different floors (two "Landing"s, two "Shower Room"s), and
+  // grouping by name would silently merge their items into one group.
+  key: string;
   roomName: string;
+  // The room's floor/area name, shown alongside roomName so two same-named
+  // rooms on different floors read as distinct groups. Null for Unassigned.
+  areaName: string | null;
+  // The area's own sort_order (matches Hizzel's floor ordering) — carried
+  // per-group rather than looked up by room/area name afterwards, since
+  // room names aren't unique across floors either.
+  areaSortOrder: number;
   items: ThingItem[];
 }
 
@@ -58,7 +70,7 @@ export function useGroupedThings(moveId: string | undefined) {
           .order("name"),
         supabase
           .from("placements")
-          .select("thing_id, room_id, rooms(name)")
+          .select("thing_id, room_id, rooms(name, areas(name, sort_order))")
           .eq("move_id", moveId!),
       ]);
 
@@ -69,26 +81,37 @@ export function useGroupedThings(moveId: string | undefined) {
         placementsRes.data.map((p) => [p.thing_id, p]),
       );
 
-      const groupsByRoom = new Map<string, ThingGroup>();
+      const groupsByKey = new Map<string, ThingGroup>();
       for (const thing of thingsRes.data) {
         const placement = placementByThing.get(thing.id);
-        const roomName = placement?.room_id
-          ? (placement.rooms?.name ?? UNASSIGNED)
-          : UNASSIGNED;
+        const roomId = placement?.room_id ?? null;
+        const key = roomId ?? UNASSIGNED;
+        const roomName = roomId ? (placement?.rooms?.name ?? UNASSIGNED) : UNASSIGNED;
+        const areaName = roomId ? (placement?.rooms?.areas?.name ?? null) : null;
+        const areaSortOrder = roomId ? (placement?.rooms?.areas?.sort_order ?? 0) : 0;
 
-        if (!groupsByRoom.has(roomName)) {
-          groupsByRoom.set(roomName, { roomName, items: [] });
+        if (!groupsByKey.has(key)) {
+          groupsByKey.set(key, {
+            key,
+            roomName,
+            areaName,
+            areaSortOrder,
+            items: [],
+          });
         }
-        groupsByRoom.get(roomName)!.items.push({
+        groupsByKey.get(key)!.items.push({
           ...thing,
-          roomId: placement?.room_id ?? null,
+          roomId,
         });
       }
 
-      // Unassigned leads — it's the to-do pile — then rooms alphabetically.
-      const groups = [...groupsByRoom.values()].sort((a, b) => {
+      // Unassigned leads — it's the to-do pile — then rooms floor-by-floor
+      // (areas' own sort_order, matching Hizzel's floor tabs) and
+      // alphabetically by room name within a floor.
+      const groups = [...groupsByKey.values()].sort((a, b) => {
         if (a.roomName === UNASSIGNED) return -1;
         if (b.roomName === UNASSIGNED) return 1;
+        if (a.areaSortOrder !== b.areaSortOrder) return a.areaSortOrder - b.areaSortOrder;
         return a.roomName.localeCompare(b.roomName);
       });
 

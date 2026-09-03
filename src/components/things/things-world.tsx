@@ -345,9 +345,12 @@ export function ThingsWorld({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[90px] [scrollbar-width:none] lg:px-9 lg:pb-10">
         {groups.map((group) => (
-          <div key={group.roomName} data-unassigned-zone={group.roomName === UNASSIGNED ? "" : undefined}>
+          <div key={group.key} data-unassigned-zone={group.roomName === UNASSIGNED ? "" : undefined}>
             <div className="pt-2.5 pb-2 text-[10px] font-medium tracking-[0.1em] text-linen-ink-tertiary uppercase lg:text-xs">
-              {group.roomName}
+              {/* Two same-named rooms on different floors ("Landing",
+                  "Shower Room") would otherwise look identical here — the
+                  floor name disambiguates which one this group is. */}
+              {group.areaName ? `${group.areaName} · ${group.roomName}` : group.roomName}
             </div>
             <div className="mb-1 grid grid-cols-[repeat(auto-fill,minmax(64px,64px))] gap-1.5 lg:grid-cols-4 lg:gap-2.5">
               {group.items.map((item) => (
