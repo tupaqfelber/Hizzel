@@ -76,6 +76,13 @@ export function HizzelWorld({
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
+  // A real drag (pointerdown -> real movement -> pointerup) still fires a
+  // plain click afterwards, same as any mouseup/touchend does — the
+  // canvas background's own "click empty space to deselect" handler below
+  // was swallowing the selection this same gesture had just set, right
+  // after setting it. Set right when a drag concludes with real movement;
+  // the canvas's onClick checks and clears it before deciding to deselect.
+  const justDraggedRef = useRef(false);
 
   // A Things card dropped straight into a room (things-world.tsx's own
   // cross-world drag) should land in the toolbar exactly as if it had been
@@ -204,6 +211,12 @@ export function HizzelWorld({
         setDrag(null);
         return;
       }
+
+      // A real drag still fires a plain click right after this pointerup —
+      // the canvas background's click-to-deselect handler needs to ignore
+      // that one, or it immediately undoes whatever selection this drag's
+      // own success branch below is about to set.
+      justDraggedRef.current = true;
 
       const draggedItem = items?.find((i) => i.id === itemId);
       if (!draggedItem) {
@@ -628,6 +641,10 @@ export function HizzelWorld({
       <div
         ref={canvasRef}
         onClick={() => {
+          if (justDraggedRef.current) {
+            justDraggedRef.current = false;
+            return;
+          }
           setSelectedItemId(null);
           setSelectedRoomId(null);
         }}
