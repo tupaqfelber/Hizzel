@@ -98,12 +98,26 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   >(null);
   const [newMoveError, setNewMoveError] = useState<string | null>(null);
   const startNewMove = useStartNewMove();
-  const { hizzelUnlocked } = useBillingStatus();
-  const [portalLoading, setPortalLoading] = useState(false);
+  const { hizzelUnlocked, product, cancelAtPeriodEnd, unlockedUntil } = useBillingStatus();
+  const [subscriptionActionLoading, setSubscriptionActionLoading] = useState(false);
 
   const current = move?.properties.find((p) => p.role === "current");
   const next = move?.properties.find((p) => p.role === "new");
   const days = move?.move_date ? daysToGo(move.move_date) : null;
+
+  // Stripe's Customer Portal can't bridge these two products directly — its
+  // "switch plan" feature only swaps between recurring prices on an
+  // existing Subscription, and the Pass has no Subscription object at all
+  // (a one-time payment). So this is bespoke, reusing the same endpoints
+  // the paywall already calls rather than routing through the portal.
+  const showsPlanOptions = !hizzelUnlocked || cancelAtPeriodEnd;
+  const subscriptionButtonLabel = subscriptionActionLoading
+    ? "Please wait…"
+    : showsPlanOptions
+      ? "Subscription"
+      : product === "pass"
+        ? "Subscribe"
+        : "Unsubscribe";
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -111,18 +125,57 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   }
 
   async function handleSubscriptionClick() {
-    if (!hizzelUnlocked) {
+    // Already cancelled-but-still-unlocked reads the same as no plan at
+    // all — they might change their mind and buy again before it lapses.
+    if (showsPlanOptions) {
       usePaywallStore.getState().open();
       return;
     }
-    setPortalLoading(true);
+
+    if (product === "pass") {
+      // Upgrade straight to Annual — the same call the paywall's own
+      // Annual card makes, just triggered from here instead.
+      setSubscriptionActionLoading(true);
+      try {
+        const res = await fetch("/api/stripe/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ product: "annual" }),
+        });
+        const body = await res.json();
+        if (!res.ok || !body.url) throw new Error(body.error ?? "Couldn't start checkout");
+        window.location.href = body.url;
+      } catch (err) {
+        setSubscriptionActionLoading(false);
+        window.alert(err instanceof Error ? err.message : "Something went wrong");
+      }
+      return;
+    }
+
+    // product === "annual": schedule cancellation, not an immediate cutoff
+    // — they've already paid for the current period.
+    const endDate = unlockedUntil
+      ? new Date(unlockedUntil).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
+      : "the end of your current billing period";
+    const confirmed = window.confirm(
+      `Cancel your Annual plan? You'll keep Hizzel unlocked until ${endDate}, then it'll lock unless you subscribe again.`,
+    );
+    if (!confirmed) return;
+
+    setSubscriptionActionLoading(true);
     try {
-      const res = await fetch("/api/stripe/portal", { method: "POST" });
+      const res = await fetch("/api/stripe/subscription/cancel", { method: "POST" });
       const body = await res.json();
-      if (!res.ok || !body.url) throw new Error(body.error ?? "Couldn't open the billing portal");
-      window.location.href = body.url;
-    } catch {
-      setPortalLoading(false);
+      if (!res.ok) throw new Error(body.error ?? "Couldn't cancel the subscription");
+      window.alert(`Done — your subscription will end on ${endDate}.`);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setSubscriptionActionLoading(false);
     }
   }
 
@@ -274,10 +327,10 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={handleSubscriptionClick}
-            disabled={portalLoading}
+            disabled={subscriptionActionLoading}
             className="flex-1 rounded-full py-2 text-center text-[11px] font-medium text-amber-ink/60 disabled:opacity-60"
           >
-            {portalLoading ? "Opening…" : "Subscription"}
+            {subscriptionButtonLabel}
           </button>
           <a
             href="mailto:hello@hizzel.com"

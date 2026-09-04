@@ -20,6 +20,7 @@ interface ProfilesBillingTable {
       stripe_subscription_id?: string | null;
       hizzel_unlocked_until?: string;
       hizzel_product?: "pass" | "annual";
+      hizzel_cancel_at_period_end?: boolean;
     }): {
       eq(col: "id" | "stripe_customer_id", val: string): Promise<{ error: { message: string } | null }>;
     };
@@ -108,6 +109,10 @@ export async function POST(request: Request) {
         stripe_subscription_id: subscriptionId,
         hizzel_unlocked_until: unlockedUntil,
         hizzel_product: product,
+        // A fresh purchase (of either product) supersedes any earlier
+        // scheduled cancellation — most relevant for someone who cancelled
+        // Annual, changed their mind, and bought again before it lapsed.
+        hizzel_cancel_at_period_end: false,
       }).eq("id", userId);
 
       posthog.capture({
