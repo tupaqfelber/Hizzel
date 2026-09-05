@@ -121,7 +121,13 @@ export function HizzelWorld({
   const { data: items } = useMoveItems(move?.id);
   const placeItem = usePlaceItem(move?.id);
   const flashingIds = useFlashStore((s) => s.flashingIds);
-  const { hizzelUnlocked } = useBillingStatus();
+  const { hizzelUnlocked: accountUnlocked } = useBillingStatus();
+  // The onboarding example move ("Hizzel Now" -> "Hizzel New", seeded for
+  // every new signup) is a free intro demo, not a real move -- billing
+  // gating never accounted for it, so exploring it hit the paywall
+  // immediately. Every gate in this file reads this combined value, not
+  // the raw account status.
+  const hizzelUnlocked = accountUnlocked || !!move?.is_example;
   const posthog = usePostHog();
 
   const canvasRef = useRef<HTMLDivElement>(null);

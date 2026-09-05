@@ -74,7 +74,10 @@ export function ThingsWorld({
 
   const { data: moveItems } = useMoveItems(move?.id);
   const placeItem = usePlaceItem(move?.id);
-  const { hizzelUnlocked } = useBillingStatus();
+  const { hizzelUnlocked: accountUnlocked } = useBillingStatus();
+  // The onboarding example move is a free intro demo, not a real move --
+  // see the matching comment in hizzel-world.tsx.
+  const hizzelUnlocked = accountUnlocked || !!move?.is_example;
   const posthog = usePostHog();
 
   // Selecting an item in Hizzel's canvas requests a scroll here (the flash

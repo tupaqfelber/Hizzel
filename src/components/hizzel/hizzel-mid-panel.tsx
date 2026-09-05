@@ -41,7 +41,10 @@ export function HizzelMidPanel({
   const { data: rooms } = useRooms(area?.id);
   const { data: items } = useMoveItems(move?.id);
   const flashingIds = useFlashStore((s) => s.flashingIds);
-  const { hizzelUnlocked } = useBillingStatus();
+  const { hizzelUnlocked: accountUnlocked } = useBillingStatus();
+  // The onboarding example move is a free intro demo, not a real move --
+  // see the matching comment in hizzel-world.tsx.
+  const hizzelUnlocked = accountUnlocked || !!move?.is_example;
   const createArea = useCreateArea(newProperty?.id);
   const [addRoomOpen, setAddRoomOpen] = useState(false);
   // Same reasoning as HizzelWorld: `area` (areas?.[0]) is undefined with
