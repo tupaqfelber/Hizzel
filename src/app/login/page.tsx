@@ -10,6 +10,21 @@ import { useAutoFocus } from "@/hooks/use-auto-focus";
 
 type Step = "email" | "code";
 
+// For any 5xx-class response, the Supabase JS SDK treats it as a
+// retryable infrastructure error rather than an application error with a
+// real message — its own error-message fallback then does
+// JSON.stringify() on the raw fetch Response object, which produces the
+// literal (and useless) string "{}", not the actual server-side reason.
+// Rather than show that verbatim, fall back to something a user can
+// actually read; the real reason (rate limiting, SMTP misconfig, an
+// actual outage) still needs checking server-side, just not from this.
+function readableAuthError(message: string): string {
+  if (message === "{}") {
+    return "Something went wrong sending that. Please try again in a moment.";
+  }
+  return message;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -30,7 +45,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOtp({ email });
     setLoading(false);
     if (error) {
-      setError(error.message);
+      setError(readableAuthError(error.message));
       return;
     }
     setStep("code");
@@ -47,7 +62,7 @@ export default function LoginPage() {
     });
     setLoading(false);
     if (error) {
-      setError(error.message);
+      setError(readableAuthError(error.message));
       return;
     }
     if (data.user) posthog?.identify(data.user.id, { email: data.user.email });
