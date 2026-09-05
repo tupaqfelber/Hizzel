@@ -34,6 +34,16 @@ interface ProfilesBillingTable {
         >;
       };
     };
+    select(cols: "stripe_subscription_id"): {
+      eq(
+        col: "id",
+        val: string,
+      ): {
+        maybeSingle(): Promise<
+          { data: { stripe_subscription_id: string | null } | null; error: { message: string } | null }
+        >;
+      };
+    };
   };
 }
 
@@ -101,6 +111,31 @@ export async function POST(request: Request) {
         unlockedUntil = periodEnd
           ? new Date(periodEnd * 1000).toISOString()
           : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+      }
+
+      // A new purchase (either product) fully supersedes whatever this
+      // account was on before — cancel any OTHER still-live subscription
+      // outright, immediately, not at period end. Without this, buying a
+      // Pass while an old Annual subscription was never explicitly
+      // cancelled (or buying a fresh Annual on top of an existing one)
+      // left that old subscription live and renewing forever, invisible to
+      // the app (our own stripe_subscription_id column just gets
+      // overwritten, but Stripe itself keeps billing it) — found live via
+      // a genuinely orphaned two-day-old test subscription. Best-effort:
+      // a failure here (already cancelled, gone, etc.) must never block
+      // recording the purchase that's actually being paid for right now.
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("stripe_subscription_id")
+        .eq("id", userId)
+        .maybeSingle();
+      const oldSubscriptionId = existingProfile?.stripe_subscription_id;
+      if (oldSubscriptionId && oldSubscriptionId !== subscriptionId) {
+        try {
+          await stripe.subscriptions.cancel(oldSubscriptionId);
+        } catch (err) {
+          console.error(`Couldn't cancel superseded subscription ${oldSubscriptionId}`, err);
+        }
       }
 
       await supabase.from("profiles").update({
