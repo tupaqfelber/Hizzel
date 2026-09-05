@@ -41,10 +41,11 @@ export function HizzelMidPanel({
   const { data: rooms } = useRooms(area?.id);
   const { data: items } = useMoveItems(move?.id);
   const flashingIds = useFlashStore((s) => s.flashingIds);
+  // This file only ever gates Add Room / Upload Plan, both deliberately
+  // exempt-from-example (see their own comments) — no combined
+  // example-exempt value is needed here, unlike hizzel-world.tsx /
+  // things-world.tsx.
   const { hizzelUnlocked: accountUnlocked } = useBillingStatus();
-  // The onboarding example move is a free intro demo, not a real move --
-  // see the matching comment in hizzel-world.tsx.
-  const hizzelUnlocked = accountUnlocked || !!move?.is_example;
   const createArea = useCreateArea(newProperty?.id);
   const [addRoomOpen, setAddRoomOpen] = useState(false);
   // Same reasoning as HizzelWorld: `area` (areas?.[0]) is undefined with
@@ -75,7 +76,11 @@ export function HizzelMidPanel({
   }
 
   async function handleAddRoomClick() {
-    if (!hizzelUnlocked) {
+    // Deliberately accountUnlocked, not hizzelUnlocked — adding a room /
+    // uploading a plan is the actual paid feature, not just trying the
+    // example out. Everything else in this file uses the example-exempt
+    // value; these two don't.
+    if (!accountUnlocked) {
       usePaywallStore.getState().open();
       return;
     }
@@ -94,7 +99,9 @@ export function HizzelMidPanel({
   }
 
   function handlePlanButtonClick() {
-    if (!hizzelUnlocked) {
+    // Deliberately accountUnlocked, not hizzelUnlocked — see
+    // handleAddRoomClick's comment above.
+    if (!accountUnlocked) {
       usePaywallStore.getState().open();
       return;
     }

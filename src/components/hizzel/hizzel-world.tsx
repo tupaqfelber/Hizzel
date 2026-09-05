@@ -438,7 +438,11 @@ export function HizzelWorld({
   // transparently creates a first area on demand so the button always
   // works, matching "the clear, obvious path for anyone without a plan".
   async function handleAddRoomClick() {
-    if (!hizzelUnlocked) {
+    // Deliberately accountUnlocked, not hizzelUnlocked — adding a room /
+    // uploading a plan is the actual paid feature, not just trying the
+    // example out. Everything else in this file uses the example-exempt
+    // value; these two don't.
+    if (!accountUnlocked) {
       usePaywallStore.getState().open();
       return;
     }
@@ -458,7 +462,9 @@ export function HizzelWorld({
   }
 
   function handlePlanButtonClick() {
-    if (!hizzelUnlocked) {
+    // Deliberately accountUnlocked, not hizzelUnlocked — see
+    // handleAddRoomClick's comment above.
+    if (!accountUnlocked) {
       usePaywallStore.getState().open();
       return;
     }
