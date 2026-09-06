@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { usePostHog } from "posthog-js/react";
 import { useAutoFocus } from "@/hooks/use-auto-focus";
-import { IconSearch, IconPlus } from "@tabler/icons-react";
+import { IconSearch, IconPlus, IconArrowsMaximize } from "@tabler/icons-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { Pill } from "@/components/ui/pill";
 import { ItemCard } from "@/components/things/item-card";
@@ -50,6 +50,7 @@ export function ThingsWorld({
   sizePx,
   onJumpToHizzel,
   onDragStart,
+  onExpand,
 }: {
   // "desktop" / "landscape": always-visible diptych (no slider), differing
   // only in sizing tier and — for this component specifically — the
@@ -68,6 +69,10 @@ export function ThingsWorld({
   // instant a drag begins, the same way a successful placement already
   // auto-jumps to full Hizzel below.
   onDragStart?: () => void;
+  // Mid's own "make me fullscreen" button, shown only at mode==="mid" —
+  // replaces the old shared divide arrows (which had a direction to get
+  // backward; this doesn't).
+  onExpand?: () => void;
 }) {
   const { data: move } = useCurrentMove();
   const { data } = useGroupedThings(move?.id);
@@ -360,6 +365,16 @@ export function ThingsWorld({
             {currentProperty ? ` · ${currentProperty.nickname}` : ""}
           </div>
         </div>
+        {mode === "mid" && onExpand && (
+          <button
+            type="button"
+            onClick={onExpand}
+            aria-label="Expand My Things"
+            className="flex h-8 w-8 shrink-0 items-center justify-center self-start rounded-full bg-linen-ink/[.07] text-linen-ink-secondary"
+          >
+            <IconArrowsMaximize size={15} />
+          </button>
+        )}
       </div>
 
       {useCompactControls ? (

@@ -140,10 +140,16 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
     const tappedStop = ([0, 0.5, 1] as const)[tappedThird];
     let moved = false;
 
+    // Dragging the handle down should feel like pulling the boundary line
+    // down with your finger — which *grows* Things (above the boundary),
+    // not Hizzel. Since position=0 means Things-full, moving the boundary
+    // down means moving position *toward* 0 — i.e. subtracting dy, not
+    // adding it. (Reported live: dragging down was growing the lower half
+    // instead of the upper one — this sign was backward.)
     function handleMove(ev: PointerEvent) {
       const dy = ev.clientY - startY;
       if (Math.abs(dy) > MOVE_THRESHOLD_PX) moved = true;
-      const next = Math.min(1, Math.max(0, startPosition + dy / window.innerHeight));
+      const next = Math.min(1, Math.max(0, startPosition - dy / window.innerHeight));
       setPosition(next);
     }
 
@@ -157,7 +163,7 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
       }
 
       const dy = ev.clientY - startY;
-      const finalRaw = Math.min(1, Math.max(0, startPosition + dy / window.innerHeight));
+      const finalRaw = Math.min(1, Math.max(0, startPosition - dy / window.innerHeight));
       animateTo(nearestStop(finalRaw));
     }
 
@@ -181,8 +187,17 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
         onDragStart={() => {
           if (!isDiptych && stop === 0) animateTo(0.5);
         }}
+        // Mid's own expand affordance lives in Things' header, not the
+        // shared divide — a plain "make me fullscreen" button per panel,
+        // with no direction to get backward.
+        onExpand={() => animateTo(0)}
       />
-      <HizzelWorld mode={hizzelMode} sizePx={hizzelSizePx} onJumpToFull={() => animateTo(0.5)} />
+      <HizzelWorld
+        mode={hizzelMode}
+        sizePx={hizzelSizePx}
+        onJumpToFull={() => animateTo(0.5)}
+        onExpand={() => animateTo(1)}
+      />
 
       {/* The divide: drag handle + stop-jump arrows + "My Hizzel" pill.
           Portrait only — landscape and desktop both show both worlds
@@ -196,50 +211,28 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
           className="absolute inset-x-0 z-30 flex touch-none items-center justify-center"
           style={{ top: `${thingsSizePx - DIVIDE_HIT_PX / 2}px`, height: `${DIVIDE_HIT_PX}px` }}
         >
-          <div className="pointer-events-none absolute left-5 flex flex-col items-center gap-0.5 rounded-2xl bg-[#2C2A25] px-2 py-1.5 shadow-lg">
-            {stop === 0.5 ? (
-              <>
-                <button
-                  type="button"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => animateTo(0)}
-                  aria-label="Expand My Things"
-                  className="pointer-events-auto flex items-center justify-center p-1"
-                >
-                  <svg width="14" height="8" viewBox="0 0 14 8" fill="none" className="shrink-0">
-                    <path d="M1 7L7 1L13 7" stroke="#F5F2EC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <div className="h-px w-3.5 bg-[rgba(245,242,236,0.25)]" />
-                <button
-                  type="button"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => animateTo(1)}
-                  aria-label="Expand Hizzel"
-                  className="pointer-events-auto flex items-center justify-center p-1"
-                >
-                  <svg width="14" height="8" viewBox="0 0 14 8" fill="none" className="shrink-0">
-                    <path d="M1 1L7 7L13 1" stroke="#F5F2EC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </>
-            ) : (
-              // At either full stop, a single down-chevron always means
-              // "collapse back to the balanced Mid view" — a universal
-              // retreat cue, not a literal pointer toward Things/Hizzel.
-              <button
-                type="button"
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => animateTo(0.5)}
-                aria-label="Back to My Things and Hizzel side by side"
-                className="pointer-events-auto flex items-center justify-center p-1"
-              >
-                <svg width="14" height="8" viewBox="0 0 14 8" fill="none" className="shrink-0">
-                  <path d="M1 1L7 7L13 1" stroke="#F5F2EC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            )}
-          </div>
+          {stop === 0.5 ? (
+            // At Mid there's nothing to jump to from the divide itself —
+            // each panel has its own "expand" button in its header now, no
+            // shared directional arrows to get backward. Just a plain grip
+            // to show this bar is draggable.
+            <div className="pointer-events-none absolute left-5 h-1 w-8 rounded-full bg-[rgba(245,242,236,0.35)]" />
+          ) : (
+            // At either full stop, a down-chevron always means "collapse
+            // back to the balanced Mid view" — a universal retreat cue, not
+            // a literal pointer toward Things/Hizzel.
+            <button
+              type="button"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => animateTo(0.5)}
+              aria-label="Back to My Things and Hizzel side by side"
+              className="pointer-events-auto absolute left-5 flex items-center justify-center rounded-2xl bg-[#2C2A25] p-2 shadow-lg"
+            >
+              <svg width="14" height="8" viewBox="0 0 14 8" fill="none" className="shrink-0">
+                <path d="M1 1L7 7L13 1" stroke="#F5F2EC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}

@@ -13,6 +13,7 @@ import {
   IconRotate,
   IconPencil,
   IconX,
+  IconArrowsMaximize,
 } from "@tabler/icons-react";
 import { usePostHog } from "posthog-js/react";
 import { useCurrentMove } from "@/hooks/use-current-move";
@@ -53,6 +54,7 @@ export function HizzelWorld({
   mode,
   sizePx,
   onJumpToFull,
+  onExpand,
 }: {
   // "desktop"/"landscape": always-visible diptych, fixed 50% split,
   // differing only in sizing tier (no structural difference here, unlike
@@ -66,6 +68,10 @@ export function HizzelWorld({
   // jumps straight to Hizzel's own Full stop — same precedent as the old
   // Mid-panel thumbnail's tap-to-expand.
   onJumpToFull?: () => void;
+  // Mid's own "make me fullscreen" button, shown only at mode==="mid" —
+  // replaces the old shared divide arrows (which had a direction to get
+  // backward; this doesn't).
+  onExpand?: () => void;
 }) {
   const { data: move } = useCurrentMove();
   const newProperty = move?.properties.find((p) => p.role === "new");
@@ -529,10 +535,23 @@ export function HizzelWorld({
       style={mode === "landscape" ? { width: "50%", height: "100%" } : { height: sizePx }}
     >
       <div
-        className={`flex items-start justify-end gap-3 px-5 pt-3.5 pb-2.5 ${
+        className={`relative flex items-start justify-end gap-3 px-5 pt-3.5 pb-2.5 ${
           mode === "desktop" ? "lg:gap-3.5 lg:px-9 lg:pt-7 lg:pb-3.5" : ""
         }`}
       >
+        {mode === "mid" && onExpand && (
+          // Left side, opposite the logo button (which sits at the right
+          // edge of this header, per the flex-row-reverse group below) —
+          // matches Things' own expand icon sitting opposite its logo too.
+          <button
+            type="button"
+            onClick={onExpand}
+            aria-label="Expand Hizzel"
+            className="absolute top-3.5 left-5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-dark-ink/[.07] text-dark-tool-label"
+          >
+            <IconArrowsMaximize size={15} />
+          </button>
+        )}
         <div className="flex flex-row-reverse items-start gap-3">
           <button
             type="button"
@@ -730,6 +749,12 @@ export function HizzelWorld({
       >
         <div className="absolute top-2.5 right-2.5 text-[9px] font-medium tracking-[0.1em] text-dark-ink/20">
           N ↑
+        </div>
+        {/* TEMPORARY — debugging the landscape blank-canvas report. Remove
+            once diagnosed. */}
+        <div className="absolute bottom-1 left-1 z-40 rounded bg-black/70 px-1.5 py-0.5 font-mono text-[8px] leading-tight text-lime-400">
+          mode={mode} canvas={Math.round(canvasSize.width)}×{Math.round(canvasSize.height)} rooms=
+          {rooms === undefined ? "loading" : rooms.length} scale={scale.pxPerCm.toFixed(3)}
         </div>
         {rooms?.map((room) => (
           <RoomBlock
