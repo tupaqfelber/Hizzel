@@ -56,6 +56,7 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
   const [myHizzelOpen, setMyHizzelOpen] = useState(false);
   const [position, setPosition] = useState(initialStop === "hizzel" ? 1 : initialStop === "things" ? 0 : 0.5);
   const [viewportHeight, setViewportHeight] = useState(0);
+  const [viewportWidth, setViewportWidth] = useState(0);
   // Desktop (>=1024px) and mobile landscape both get the always-visible
   // diptych, just at different sizing tiers (CSS's own lg: vs
   // max-lg:landscape: classes handle that split, not this JS value) — the
@@ -76,6 +77,7 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
   useIsomorphicLayoutEffect(() => {
     function update() {
       setViewportHeight(window.innerHeight);
+      setViewportWidth(window.innerWidth);
       setIsDesktopWidth(window.innerWidth >= DESKTOP_BREAKPOINT_PX);
       setIsLandscape(window.innerWidth > window.innerHeight);
     }
@@ -121,6 +123,17 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
   const rawThingsPx = (1 - position) * viewportHeight;
   const thingsSizePx = Math.min(Math.max(rawThingsPx, SLIVER_PX), viewportHeight - SLIVER_PX);
   const hizzelSizePx = viewportHeight - thingsSizePx;
+  // Landscape's own sizing: an explicit pixel width/height computed
+  // directly from the same viewportWidth/viewportHeight state that
+  // decides orientation in the first place — not a CSS percentage
+  // (width:50%, height:100%) resolved against the ancestor chain. A live
+  // report showed the canvas measuring a stale, portrait-shaped size
+  // despite `mode` correctly reading "landscape"; percentages depend on
+  // every ancestor having already settled its own box before the child
+  // resolves, which is exactly the kind of thing that can lag a beat
+  // behind a real device's orientation change. A plain number computed
+  // once, here, has nothing to resolve — it just is what it is.
+  const landscapeWidthPx = Math.round(viewportWidth / 2);
 
   const diptychMode: WorldMode = isDesktopWidth ? "desktop" : "landscape";
   const thingsMode: WorldMode = isDiptych ? diptychMode : stop === 0.5 ? "mid" : stop === 0 ? "full" : "sliver";
@@ -185,6 +198,8 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
       <ThingsWorld
         mode={thingsMode}
         sizePx={thingsSizePx}
+        landscapeWidthPx={landscapeWidthPx}
+        landscapeHeightPx={viewportHeight}
         // The Things sliver (visible at Full-Hizzel) always returns to the
         // balanced Mid view, not all the way to Full-Things — same "one tap
         // gets you back to seeing both worlds" behaviour as the arrow pill.
@@ -204,6 +219,8 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
       <HizzelWorld
         mode={hizzelMode}
         sizePx={hizzelSizePx}
+        landscapeWidthPx={landscapeWidthPx}
+        landscapeHeightPx={viewportHeight}
         onJumpToFull={() => animateTo(0.5)}
         onExpand={() => animateTo(1)}
       />

@@ -48,6 +48,8 @@ const CATEGORIES: ThingCategory[] = [
 export function ThingsWorld({
   mode,
   sizePx,
+  landscapeWidthPx,
+  landscapeHeightPx,
   onJumpToHizzel,
   onDragStart,
   onExpand,
@@ -61,6 +63,10 @@ export function ThingsWorld({
   // current height allocation for this world. Ignored for "desktop"/
   // "landscape", which size via a fixed 50% split instead.
   sizePx: number;
+  // Only meaningful for mode==="landscape" — explicit pixel dimensions,
+  // see the matching comment in hizzel-world.tsx.
+  landscapeWidthPx?: number;
+  landscapeHeightPx?: number;
   onJumpToHizzel: () => void;
   // Called the moment a card drag actually starts moving (not on a plain
   // tap). At the portrait Full-Things stop, the Hizzel sliver below is a
@@ -329,7 +335,11 @@ export function ThingsWorld({
       className={`relative flex min-h-0 w-full shrink-0 flex-col overflow-hidden bg-linen ${
         mode === "desktop" ? "lg:!w-1/2 lg:!h-full" : ""
       }`}
-      style={mode === "landscape" ? { width: "50%", height: "100%" } : { height: sizePx }}
+      style={
+        mode === "landscape"
+          ? { width: landscapeWidthPx, height: landscapeHeightPx }
+          : { height: sizePx }
+      }
     >
       <div
         className={`flex items-center gap-2.5 px-5 pt-3.5 pb-2.5 ${

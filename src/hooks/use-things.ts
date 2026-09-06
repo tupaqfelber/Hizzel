@@ -88,6 +88,22 @@ export function useGroupedThings(moveId: string | undefined) {
       );
 
       const groupsByKey = new Map<string, ThingGroup>();
+      // Seeded up front, even with zero items — Unassigned is now the only
+      // place to retrieve something dragged out of a room (Hizzel's own
+      // tray is disabled, see hizzel-world.tsx), so it needs to always be
+      // a real, visible drop target, not just appear once something has
+      // already landed there.
+      if (thingsRes.data.length > 0) {
+        groupsByKey.set(UNASSIGNED, {
+          key: UNASSIGNED,
+          roomName: UNASSIGNED,
+          areaName: null,
+          areaSortOrder: 0,
+          roomWidthCm: null,
+          roomDepthCm: null,
+          items: [],
+        });
+      }
       for (const thing of thingsRes.data) {
         const placement = placementByThing.get(thing.id);
         const roomId = placement?.room_id ?? null;

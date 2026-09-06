@@ -49,10 +49,23 @@ interface DragState {
 
 // Matches ThingsWorld's own — the sliver's fixed peek height.
 const SLIVER_HEIGHT_PX = 84;
+// The tray strip used to be the only way to see/reach an unplaced item
+// while working inside Hizzel. Now that Things is visible alongside
+// Hizzel in every mode that matters for dragging (Mid, landscape,
+// desktop), and Things' own Unassigned group is always present (see
+// use-things.ts) as a real drop target, the tray is redundant — and was
+// also a layout-participating flex sibling whose content changes forced
+// the canvas to keep resizing/re-measuring, a real contributor to the
+// landscape sizing bugs. Kept disabled rather than deleted in case it's
+// wanted back — nothing else needs to change if TRAY_ENABLED flips back
+// to true (trayItems, TrayCard, and the drop-zone marker are all intact).
+const TRAY_ENABLED = false;
 
 export function HizzelWorld({
   mode,
   sizePx,
+  landscapeWidthPx,
+  landscapeHeightPx,
   onJumpToFull,
   onExpand,
 }: {
@@ -64,6 +77,13 @@ export function HizzelWorld({
   // Only meaningful for "full"/"mid"/"sliver" (portrait) — the slider's
   // current height allocation for this world.
   sizePx: number;
+  // Only meaningful for mode==="landscape" — explicit pixel dimensions
+  // computed once in AppShell from the same viewportWidth/viewportHeight
+  // state that decides orientation, rather than a CSS percentage (which
+  // depends on the whole ancestor chain having already settled its own
+  // box — see the matching comment in app-shell.tsx).
+  landscapeWidthPx?: number;
+  landscapeHeightPx?: number;
   // Tapping the Hizzel sliver (shown below portrait's Full-Things stop)
   // jumps straight to Hizzel's own Full stop — same precedent as the old
   // Mid-panel thumbnail's tap-to-expand.
@@ -532,7 +552,11 @@ export function HizzelWorld({
       className={`relative flex min-h-0 w-full shrink-0 flex-col overflow-hidden bg-dark ${
         mode === "desktop" ? "lg:!w-1/2 lg:!h-full" : ""
       }`}
-      style={mode === "landscape" ? { width: "50%", height: "100%" } : { height: sizePx }}
+      style={
+        mode === "landscape"
+          ? { width: landscapeWidthPx, height: landscapeHeightPx }
+          : { height: sizePx }
+      }
     >
       <div
         className={`relative flex items-start justify-end gap-3 px-5 pt-3.5 pb-2.5 ${
@@ -798,20 +822,23 @@ export function HizzelWorld({
           (see things-world.tsx's startCardDrag) — always rendered, even
           with zero items, so dragging the very first thing into an empty
           tray still has somewhere to land. empty:py-0 collapses it to no
-          height when there's nothing in it, so it stays invisible. */}
-      <div
-        data-hizzel-tray
-        className="flex shrink-0 gap-3 overflow-x-auto px-4 py-3 empty:py-0 [scrollbar-width:none] lg:pl-24"
-      >
-        {trayItems.map((item) => (
-          <TrayCard
-            key={item.id}
-            item={item}
-            dragging={drag?.itemId === item.id}
-            onPointerDown={(e) => startDrag(item.id, e)}
-          />
-        ))}
-      </div>
+          height when there's nothing in it, so it stays invisible.
+          Disabled — see TRAY_ENABLED above. */}
+      {TRAY_ENABLED && (
+        <div
+          data-hizzel-tray
+          className="flex shrink-0 gap-3 overflow-x-auto px-4 py-3 empty:py-0 [scrollbar-width:none] lg:pl-24"
+        >
+          {trayItems.map((item) => (
+            <TrayCard
+              key={item.id}
+              item={item}
+              dragging={drag?.itemId === item.id}
+              onPointerDown={(e) => startDrag(item.id, e)}
+            />
+          ))}
+        </div>
+      )}
 
       {addRoomOpen && addRoomAreaId && (
         <RoomFormSheet
