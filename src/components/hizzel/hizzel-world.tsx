@@ -37,6 +37,7 @@ import { EditAreasSheet } from "@/components/hizzel/edit-areas-sheet";
 import { ThingFormSheet } from "@/components/things/thing-form-sheet";
 import { FloorPlanReviewSheet } from "@/components/hizzel/floorplan-review-sheet";
 import { useExtractFloorPlan, type ExtractResponse } from "@/hooks/use-floorplan-import";
+import type { WorldMode } from "@/components/app-shell";
 
 interface DragState {
   itemId: string;
@@ -44,12 +45,26 @@ interface DragState {
   clientY: number;
 }
 
+// Matches ThingsWorld's own — the sliver's fixed peek height.
+const SLIVER_HEIGHT_PX = 84;
+
 export function HizzelWorld({
-  widthPx,
-  mobileActive,
+  mode,
+  sizePx,
+  onJumpToFull,
 }: {
-  widthPx: number;
-  mobileActive: boolean;
+  // "desktop"/"landscape": always-visible diptych, fixed 50% split,
+  // differing only in sizing tier (no structural difference here, unlike
+  // ThingsWorld's controls row). "full"/"mid"/"sliver": portrait's three
+  // slider stops.
+  mode: WorldMode;
+  // Only meaningful for "full"/"mid"/"sliver" (portrait) — the slider's
+  // current height allocation for this world.
+  sizePx: number;
+  // Tapping the Hizzel sliver (shown below portrait's Full-Things stop)
+  // jumps straight to Hizzel's own Full stop — same precedent as the old
+  // Mid-panel thumbnail's tap-to-expand.
+  onJumpToFull?: () => void;
 }) {
   const { data: move } = useCurrentMove();
   const newProperty = move?.properties.find((p) => p.role === "new");
@@ -148,12 +163,13 @@ export function HizzelWorld({
     return () => observer.disconnect();
   }, []);
 
-  // The mobile 3-stop slider changes this world's width continuously (every
-  // live drag pointermove, and every step of the snap-to-stop animation) —
-  // re-measure each time so the room/item scale never uses a stale width.
+  // The portrait 3-stop slider changes this world's height continuously
+  // (every live drag pointermove, and every step of the snap-to-stop
+  // animation) — re-measure each time so the room/item scale never uses a
+  // stale size.
   useEffect(() => {
     measureCanvas();
-  }, [widthPx]);
+  }, [sizePx, mode]);
 
   const scale = computeCanvasScale(rooms ?? [], canvasSize.width, canvasSize.height);
 
@@ -477,13 +493,41 @@ export function HizzelWorld({
     planFileInputRef.current?.click();
   }
 
+  if (mode === "sliver") {
+    return (
+      <button
+        type="button"
+        onClick={onJumpToFull}
+        aria-label="Open Hizzel"
+        className="flex w-full shrink-0 items-center justify-end gap-2.5 bg-dark px-5 text-right"
+        style={{ height: SLIVER_HEIGHT_PX }}
+      >
+        <div className="flex flex-col items-end">
+          <span className="font-serif text-[15px] leading-none text-dark-ink">
+            {newProperty?.nickname ?? "…"}
+          </span>
+          <span className="mt-[2px] text-[8px] text-dark-ink-tertiary">
+            {selectedArea?.name ?? "No area yet"}
+          </span>
+        </div>
+        <Image src="/logo-on-dark.png" alt="" width={20} height={20} />
+      </button>
+    );
+  }
+
   return (
     <div
-      className={`relative ${mobileActive ? "flex" : "hidden"} h-dvh min-w-0 shrink-0 flex-col overflow-hidden bg-dark lg:flex lg:!w-1/2 lg:h-full ${widthPx === 0 ? "max-lg:pointer-events-none" : ""}`}
-      style={{ width: `${widthPx}px` }}
+      className={`relative flex min-h-0 w-full shrink-0 flex-col overflow-hidden bg-dark ${
+        mode === "desktop" ? "lg:!w-1/2 lg:!h-full" : ""
+      }`}
+      style={mode === "landscape" ? { width: "50%", height: "100%" } : { height: sizePx }}
     >
-      <div className="flex items-center gap-3 px-5 pt-3.5 pb-2.5 lg:items-start lg:justify-end lg:gap-3.5 lg:px-9 lg:pt-7 lg:pb-3.5">
-        <div className="flex items-center gap-3 lg:flex-row-reverse lg:items-start">
+      <div
+        className={`flex items-start justify-end gap-3 px-5 pt-3.5 pb-2.5 ${
+          mode === "desktop" ? "lg:gap-3.5 lg:px-9 lg:pt-7 lg:pb-3.5" : ""
+        }`}
+      >
+        <div className="flex flex-row-reverse items-start gap-3">
           <button
             type="button"
             onClick={() => setMyHizzelOpen(true)}
@@ -492,11 +536,23 @@ export function HizzelWorld({
           >
             <Image src="/logo-on-dark.png" alt="" width={38} height={38} />
           </button>
-          <div className="relative flex-1 lg:flex-initial lg:flex lg:flex-col lg:items-end lg:text-right">
-            <div className="mb-0.5 text-[9px] tracking-[0.14em] text-dark-ink-secondary uppercase lg:text-[11px]">
+          <div
+            className={`relative flex flex-col items-end text-right ${
+              mode === "desktop" ? "flex-1 lg:flex-initial" : ""
+            }`}
+          >
+            <div
+              className={`mb-0.5 text-[9px] tracking-[0.14em] text-dark-ink-secondary uppercase ${
+                mode === "desktop" ? "lg:text-[11px]" : ""
+              }`}
+            >
               Hizzel
             </div>
-            <h1 className="font-serif text-[22px] leading-none tracking-[-0.3px] text-dark-ink lg:text-[32px]">
+            <h1
+              className={`font-serif leading-none tracking-[-0.3px] text-dark-ink ${
+                mode === "desktop" ? "text-[22px] lg:text-[32px]" : "text-[18px]"
+              }`}
+            >
               {newProperty?.nickname ?? "…"}
             </h1>
             <button
@@ -529,7 +585,11 @@ export function HizzelWorld({
         </div>
       </div>
 
-      <div className="flex items-center gap-[5px] px-5 pb-2.5 lg:justify-end lg:gap-[7px] lg:px-9 lg:flex-row-reverse">
+      <div
+        className={`flex flex-row-reverse items-center justify-end gap-[5px] px-5 pb-2.5 ${
+          mode === "desktop" ? "lg:gap-[7px] lg:px-9" : ""
+        }`}
+      >
         <button
           type="button"
           onClick={handleAddRoomClick}
@@ -721,10 +781,6 @@ export function HizzelWorld({
           />
         ))}
       </div>
-
-      {/* Reserves space for the shared bottom toggle bar, now rendered by
-          AppShell as a fixed overlay spanning both worlds. */}
-      <div className="h-[72px] shrink-0 lg:hidden" />
 
       {addRoomOpen && addRoomAreaId && (
         <RoomFormSheet

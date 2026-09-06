@@ -21,8 +21,11 @@ import { useBillingStatus } from "@/hooks/use-billing-status";
 import { usePaywallStore } from "@/hooks/use-paywall-store";
 import { rotatedFootprint, resolvePlacement } from "@/lib/item-snap";
 import type { ThingCategory } from "@/lib/supabase/types";
+import type { WorldMode } from "@/components/app-shell";
 
 const HOVER_OUTLINE = "2px solid rgba(245,242,236,0.5)";
+// Matches AppShell's own SLIVER_PX — the sliver's fixed peek height.
+const SLIVER_HEIGHT_PX = 84;
 
 interface CardDragState {
   thingId: string;
@@ -43,19 +46,27 @@ const CATEGORIES: ThingCategory[] = [
 ];
 
 export function ThingsWorld({
-  widthPx,
+  mode,
+  sizePx,
   onJumpToHizzel,
   onDragStart,
 }: {
-  widthPx: number;
+  // "desktop" / "landscape": always-visible diptych (no slider), differing
+  // only in sizing tier and — for this component specifically — the
+  // controls row's own structural arrangement (see the render below).
+  // "full" / "mid" / "sliver": portrait's three slider stops.
+  mode: WorldMode;
+  // Only meaningful for "full"/"mid"/"sliver" (portrait) — the slider's
+  // current height allocation for this world. Ignored for "desktop"/
+  // "landscape", which size via a fixed 50% split instead.
+  sizePx: number;
   onJumpToHizzel: () => void;
   // Called the moment a card drag actually starts moving (not on a plain
-  // tap). On mobile, sitting fully at the "Things" stop leaves no room to
-  // drop onto at all — the Mid panel's thumbnail is still in the DOM there,
-  // but shrunk to 0 width with pointer-events disabled, so it can never be
-  // an elementFromPoint hit. AppShell uses this to auto-reveal the Mid
-  // split the instant a drag begins, the same way a successful placement
-  // already auto-jumps to full Hizzel below.
+  // tap). At the portrait Full-Things stop, the Hizzel sliver below is a
+  // static preview, not a real canvas — a card drag started there still
+  // has nowhere real to land. AppShell uses this to auto-reveal Mid the
+  // instant a drag begins, the same way a successful placement already
+  // auto-jumps to full Hizzel below.
   onDragStart?: () => void;
 }) {
   const { data: move } = useCurrentMove();
@@ -82,9 +93,7 @@ export function ThingsWorld({
 
   // Selecting an item in Hizzel's canvas requests a scroll here (the flash
   // itself needs no extra wiring — ItemCard already reacts to the same
-  // useFlashStore id that selection flashes). Only reachable with this
-  // panel actually on screen: on mobile, item selection only happens in
-  // the full-Hizzel stop, where this panel is 0-width anyway.
+  // useFlashStore id that selection flashes).
   const scrollToItemId = useScrollToItemStore((s) => s.itemId);
   const scrollToItemNonce = useScrollToItemStore((s) => s.nonce);
   useEffect(() => {
@@ -109,9 +118,10 @@ export function ThingsWorld({
     }))
     .filter((group) => group.items.length > 0);
 
-  // Drag a card straight from Things into a Hizzel room (desktop diptych).
-  // Reuses the same placement pipeline hizzel-world.tsx's in-canvas drag uses —
-  // this is just a second entry point into it, sourced from a Things card.
+  // Drag a card straight from Things into a Hizzel room (desktop/landscape
+  // diptych, or the portrait slider once a room is on screen). Reuses the
+  // same placement pipeline hizzel-world.tsx's in-canvas drag uses — this
+  // is just a second entry point into it, sourced from a Things card.
   function startCardDrag(thing: ThingItem, e: React.PointerEvent) {
     e.preventDefault();
     const startX = e.clientX;
@@ -170,19 +180,6 @@ export function ThingsWorld({
       const draggedItem = moveItems?.find((i) => i.id === thing.id);
       const el = document.elementFromPoint(ev.clientX, ev.clientY);
       const roomEl = (el?.closest("[data-room-id]") as HTMLElement | null) ?? lastHoveredRoomEl;
-      // The Mid panel's thumbnail rooms carry the same data-room-id the
-      // full canvas does, so a hit there is indistinguishable from a hit
-      // on the roomEl.closest() above. This just tells us whether we're
-      // inside the Mid drop zone at all, for the two cases below it: a
-      // successful thumbnail placement also jumps to full Hizzel (the
-      // thumbnail is too small to see the result on), and a drop that
-      // lands in the zone but misses every room still confirms the item
-      // as unassigned instead of silently doing nothing.
-      const inMidZone =
-        !!el?.closest("[data-hizzel-mid-zone]") || !!roomEl?.closest("[data-hizzel-mid-zone]");
-      // The full Hizzel world's own tray strip (visible in the desktop
-      // diptych) — a drop here is explicit tray intent, same as missing
-      // every room inside the Mid zone below.
       const inTrayZone = !!el?.closest("[data-hizzel-tray]");
       // Dragging a room-placed card and dropping it back on Things world's
       // own Unassigned group — same explicit "send to tray" intent as the
@@ -249,7 +246,6 @@ export function ThingsWorld({
           // as if you'd tapped it there directly — not whatever was
           // selected before, or nothing.
           useSelectItemStore.getState().requestSelect(thing.id);
-          if (inMidZone) onJumpToHizzel();
           for (const bumped of placed.displaced) {
             const bumpedItem = roomItems.find((i) => i.id === bumped.id);
             if (!bumpedItem) continue;
@@ -274,12 +270,12 @@ export function ThingsWorld({
             useFlashStore.getState().flash(unplacedId);
           }
         }
-      } else if (draggedItem && (inMidZone || inTrayZone || inUnassignedZone)) {
+      } else if (draggedItem && (inTrayZone || inUnassignedZone)) {
         // Missed every room but still landed in a recognized drop zone.
-        // Hizzel's Mid panel / tray strip is explicit "send to tray"
-        // intent, same as the arrow. Things' own Unassigned group is NOT —
-        // that's just taking it out of the room, and shouldn't clutter the
-        // tray any more than a thing that's never been touched would.
+        // Hizzel's own tray strip is explicit "send to tray" intent, same
+        // as the arrow. Things' own Unassigned group is NOT — that's just
+        // taking it out of the room, and shouldn't clutter the tray any
+        // more than a thing that's never been touched would.
         placeItem.mutate({
           thingId: thing.id,
           roomId: null,
@@ -302,12 +298,39 @@ export function ThingsWorld({
 
   const draggedCardItem = cardDrag ? moveItems?.find((i) => i.id === cardDrag.thingId) : undefined;
 
+  // Compact single-row controls (search + categories + a small inline
+  // "+Thing" pill) — landscape and portrait-Mid both only ever have half
+  // the screen's height to work with, so a separate full-width button row
+  // (see the "full" case below) would eat too much of it.
+  const useCompactControls = mode === "landscape" || mode === "mid";
+
+  if (mode === "sliver") {
+    return (
+      <button
+        type="button"
+        onClick={onJumpToHizzel}
+        aria-label="Open Things"
+        className="flex w-full shrink-0 items-center gap-2.5 bg-linen px-5 text-left"
+        style={{ height: SLIVER_HEIGHT_PX }}
+      >
+        <Image src="/logo.png" alt="" width={26} height={26} className="mix-blend-multiply" />
+        <span className="font-serif text-[17px] leading-none text-linen-ink">My Things</span>
+      </button>
+    );
+  }
+
   return (
     <div
-      className={`relative flex h-dvh min-w-0 shrink-0 flex-col overflow-hidden bg-linen lg:!w-1/2 lg:h-full ${widthPx === 0 ? "max-lg:pointer-events-none" : ""}`}
-      style={{ width: `${widthPx}px` }}
+      className={`relative flex min-h-0 w-full shrink-0 flex-col overflow-hidden bg-linen ${
+        mode === "desktop" ? "lg:!w-1/2 lg:!h-full" : ""
+      }`}
+      style={mode === "landscape" ? { width: "50%", height: "100%" } : { height: sizePx }}
     >
-      <div className="flex items-center gap-2.5 px-5 pt-3.5 pb-2.5 lg:items-start lg:px-9 lg:pt-7 lg:pb-3.5">
+      <div
+        className={`flex items-center gap-2.5 px-5 pt-3.5 pb-2.5 ${
+          mode === "desktop" ? "lg:items-start lg:px-9 lg:pt-7 lg:pb-3.5" : ""
+        }`}
+      >
         <button type="button" onClick={() => setMyHizzelOpen(true)} aria-label="Open My Hizzel">
           <Image
             src="/logo.png"
@@ -318,10 +341,18 @@ export function ThingsWorld({
           />
         </button>
         <div className="flex-1">
-          <div className="mb-0.5 text-[9px] tracking-[0.14em] text-linen-ink-tertiary uppercase lg:text-[11px]">
+          <div
+            className={`mb-0.5 text-[9px] tracking-[0.14em] text-linen-ink-tertiary uppercase ${
+              mode === "desktop" ? "lg:text-[11px]" : ""
+            }`}
+          >
             Hizzel
           </div>
-          <h1 className="font-serif text-[22px] leading-none tracking-[-0.3px] text-linen-ink lg:text-[32px]">
+          <h1
+            className={`font-serif leading-none tracking-[-0.3px] text-linen-ink ${
+              mode === "desktop" ? "text-[22px] lg:text-[32px]" : "text-[18px]"
+            }`}
+          >
             My Things
           </h1>
           <div className="mt-0.5 text-[11px] text-[#B0A898]">
@@ -331,68 +362,118 @@ export function ThingsWorld({
         </div>
       </div>
 
-      <div className="mx-5 mb-3 flex items-center gap-2 lg:mx-9">
-        <button
-          type="button"
-          onClick={() => setSheetState({ mode: "add" })}
-          className="flex items-center gap-1 rounded-[10px] border-[0.5px] border-linen-ink/10 bg-linen-ink/[.07] px-3.5 py-[7px] text-[11px] font-medium whitespace-nowrap text-linen-ink-secondary"
-        >
-          <IconPlus size={12} /> Thing
-        </button>
-        <IconButton
-          icon={IconSearch}
-          label="Search"
-          shape="square"
-          size="md"
-          onClick={() => setSearchOpen((v) => !v)}
-        />
-        {searchOpen && (
+      {useCompactControls ? (
+        // Landscape / portrait-Mid: search, categories, and a small
+        // inline "+Thing" pill all share one row — matches
+        // hizzel_landscape_v3 / hizzel_portrait_mid_v4 exactly.
+        <div className="mb-3 flex items-center gap-1.5 overflow-x-auto px-5 [scrollbar-width:none]">
+          <IconButton
+            icon={IconSearch}
+            label="Search"
+            shape="square"
+            size="sm"
+            onClick={() => setSearchOpen((v) => !v)}
+          />
+          <Pill size="sm" active={category === "All"} onClick={() => setCategory("All")}>
+            All
+          </Pill>
+          {CATEGORIES.map((c) => (
+            <Pill key={c} size="sm" active={category === c} onClick={() => setCategory(c)}>
+              {c}
+            </Pill>
+          ))}
+          <button
+            type="button"
+            onClick={() => setSheetState({ mode: "add" })}
+            className="flex shrink-0 items-center gap-1 rounded-[10px] border-[0.5px] border-linen-ink/10 bg-linen-ink/[.07] px-3 py-[6px] text-[10px] font-medium whitespace-nowrap text-linen-ink-secondary"
+          >
+            <IconPlus size={10} /> Thing
+          </button>
+        </div>
+      ) : (
+        // Desktop (unchanged) and portrait-Full (the new "v4" treatment):
+        // search + full category list on one row, then a full-width
+        // "+ Thing" button on its own row below.
+        <>
+          <div
+            className={`mb-3 flex items-center gap-1.5 overflow-x-auto px-5 [scrollbar-width:none] ${
+              mode === "desktop" ? "lg:px-9" : ""
+            }`}
+          >
+            <IconButton
+              icon={IconSearch}
+              label="Search"
+              shape="square"
+              size={mode === "desktop" ? "md" : "sm"}
+              onClick={() => setSearchOpen((v) => !v)}
+            />
+            <Pill size="sm" active={category === "All"} onClick={() => setCategory("All")}>
+              All
+            </Pill>
+            {CATEGORIES.map((c) => (
+              <Pill key={c} size="sm" active={category === c} onClick={() => setCategory(c)}>
+                {c}
+              </Pill>
+            ))}
+          </div>
+          <div className={`mb-3 px-5 ${mode === "desktop" ? "lg:px-9" : ""}`}>
+            <button
+              type="button"
+              onClick={() => setSheetState({ mode: "add" })}
+              className="flex w-full items-center justify-center gap-1 rounded-full bg-linen-ink py-[9px] text-xs font-medium text-linen"
+            >
+              <IconPlus size={12} /> Thing
+            </button>
+          </div>
+        </>
+      )}
+
+      {searchOpen && (
+        <div className={`mb-3 px-5 ${mode === "desktop" ? "lg:px-9" : ""}`}>
           <input
             ref={searchInputRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search things…"
-            className="min-w-0 flex-1 rounded-[10px] bg-linen-field px-3 py-2 text-sm text-linen-ink placeholder:text-[#B0A898] focus:outline-none"
+            className="w-full rounded-[10px] bg-linen-field px-3 py-2 text-sm text-linen-ink placeholder:text-[#B0A898] focus:outline-none"
           />
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="mb-3 flex gap-1.5 overflow-x-auto px-5 [scrollbar-width:none] lg:px-9">
-        <Pill size="sm" active={category === "All"} onClick={() => setCategory("All")}>
-          All
-        </Pill>
-        {CATEGORIES.map((c) => (
-          <Pill key={c} size="sm" active={category === c} onClick={() => setCategory(c)}>
-            {c}
-          </Pill>
-        ))}
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[90px] [scrollbar-width:none] lg:px-9 lg:pb-10">
+      <div
+        className={`min-h-0 flex-1 overflow-y-auto px-4 pb-[90px] [scrollbar-width:none] ${
+          mode === "desktop" ? "lg:px-9 lg:pb-10" : ""
+        }`}
+      >
         {groups.map((group) => (
           <div
             key={group.key}
             data-unassigned-zone={group.roomName === UNASSIGNED ? "" : undefined}
-            // Same three data attributes RoomBlock and the Mid panel
-            // thumbnail carry — makes a room's own section in this list a
-            // real drop target, running through the exact same
-            // elementFromPoint hit-test and resolvePlacement pipeline a
-            // canvas drop does (no separate "list drop" logic to keep in
-            // sync). The resulting x/y is derived from wherever in this
-            // (arbitrarily-sized) section the pointer happened to land,
-            // same as it already is for the thumbnail's own non-1:1 scale
-            // — clamped into the room by resolvePlacement either way.
+            // Same three data attributes RoomBlock and a canvas room carry
+            // — makes a room's own section in this list a real drop
+            // target, running through the exact same elementFromPoint
+            // hit-test and resolvePlacement pipeline a canvas drop does.
             data-room-id={group.roomWidthCm != null ? group.key : undefined}
             data-width-cm={group.roomWidthCm ?? undefined}
             data-depth-cm={group.roomDepthCm ?? undefined}
           >
-            <div className="pt-2.5 pb-2 text-[10px] font-medium tracking-[0.1em] text-linen-ink-tertiary uppercase lg:text-xs">
+            <div
+              className={`pt-2.5 pb-2 text-[10px] font-medium tracking-[0.1em] text-linen-ink-tertiary uppercase ${
+                mode === "desktop" ? "lg:text-xs" : ""
+              }`}
+            >
               {/* Two same-named rooms on different floors ("Landing",
                   "Shower Room") would otherwise look identical here — the
                   floor name disambiguates which one this group is. */}
               {group.areaName ? `${group.areaName} · ${group.roomName}` : group.roomName}
             </div>
-            <div className="mb-1 grid grid-cols-[repeat(auto-fill,minmax(64px,64px))] gap-1.5 lg:grid-cols-4 lg:gap-2.5">
+            <div
+              className={`mb-1 grid gap-1.5 ${
+                mode === "desktop"
+                  ? "grid-cols-[repeat(auto-fill,minmax(64px,64px))] lg:grid-cols-4 lg:gap-2.5"
+                  : "grid-cols-5"
+              }`}
+            >
               {group.items.map((item) => (
                 <ItemCard
                   key={item.id}

@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ThingsWorld } from "@/components/things/things-world";
 import { HizzelWorld } from "@/components/hizzel/hizzel-world";
-import { HizzelMidPanel } from "@/components/hizzel/hizzel-mid-panel";
 import { MyHizzelOverlay } from "@/components/my-hizzel/my-hizzel-overlay";
 import { PaywallSheet } from "@/components/billing/paywall-sheet";
 import { useCurrentMove } from "@/hooks/use-current-move";
@@ -11,10 +10,19 @@ import { useIdentifyUser } from "@/hooks/use-identify-user";
 
 const MOVE_THRESHOLD_PX = 5;
 const SNAP_DURATION_MS = 250;
+// Below this width, "desktop" ends and the mobile orientation split
+// (landscape diptych vs portrait slider) takes over — matches Tailwind's
+// default `lg` breakpoint exactly, since every `lg:`-scoped class already
+// throughout the app assumes that boundary.
+const DESKTOP_BREAKPOINT_PX = 1024;
+// A resting Full stop still leaves this much of the *other* world visible
+// as a compact "sliver" (logo + one line of context) rather than shrinking
+// it to nothing — the whole point of the sliver is a permanent reminder
+// the other world still exists, one tap/swipe away.
+const SLIVER_PX = 84;
 
-// The three resting positions of the mobile Things <-> Hizzel slider:
-// 0 = Things full, 0.5 = Mid (both worlds visible, mobile-sized diptych),
-// 1 = Hizzel full. Desktop ignores this entirely (fixed 50/50 via lg:!w-1/2).
+// Portrait's three resting stops. Landscape and desktop ignore this
+// entirely — both worlds are always fully visible there, no slider at all.
 function nearestStop(position: number): 0 | 0.5 | 1 {
   if (position < 0.25) return 0;
   if (position < 0.75) return 0.5;
@@ -25,21 +33,41 @@ function easeOutCubic(t: number) {
   return 1 - Math.pow(1 - t, 3);
 }
 
+// "desktop" and "landscape" both mean "always-visible diptych, no
+// slider" — split into two values (rather than one shared "diptych")
+// because Things' own controls row is structurally different between the
+// three non-full-height contexts (desktop's existing layout, landscape's
+// single compact row, portrait-mid's matching compact row), not just a
+// sizing-tier difference. HizzelWorld doesn't need the distinction — its
+// header/toolbar shape is identical between desktop and landscape, only
+// the CSS sizing tier (lg: vs max-lg:landscape:) differs — but takes the
+// same five-value type for consistency between the two components.
+export type WorldMode = "desktop" | "landscape" | "full" | "mid" | "sliver";
+
 export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" }) {
   useIdentifyUser();
   const { data: move } = useCurrentMove();
   const [myHizzelOpen, setMyHizzelOpen] = useState(false);
   const [position, setPosition] = useState(initialStop === "hizzel" ? 1 : 0);
-  const [viewportWidth, setViewportWidth] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  // Desktop (>=1024px) and mobile landscape both get the always-visible
+  // diptych, just at different sizing tiers (CSS's own lg: vs
+  // max-lg:landscape: classes handle that split, not this JS value) — the
+  // slider only exists for portrait, below the desktop breakpoint.
+  const [isDesktopWidth, setIsDesktopWidth] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(false);
+  const isDiptych = isDesktopWidth || isLandscape;
   const animationRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    function updateWidth() {
-      setViewportWidth(window.innerWidth);
+    function update() {
+      setViewportHeight(window.innerHeight);
+      setIsDesktopWidth(window.innerWidth >= DESKTOP_BREAKPOINT_PX);
+      setIsLandscape(window.innerWidth > window.innerHeight);
     }
-    updateWidth();
-    window.addEventListener("resize", updateWidth);
-    return () => window.removeEventListener("resize", updateWidth);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
   }, []);
 
   useEffect(() => {
@@ -70,27 +98,38 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" }) 
     step();
   }
 
-  const thingsWidthPx = (1 - position) * viewportWidth;
-  const hizzelWidthPx = position * viewportWidth;
-  const thingsWidthPercent = (1 - position) * 100;
   const stop = nearestStop(position);
+  // Raw proportional split, then floor each side at SLIVER_PX so neither
+  // ever visually disappears — the "minority" side settles at a permanent
+  // peek height instead of 0, and the other absorbs the remainder. This
+  // holds throughout the whole drag, not just at rest, so there's no jump
+  // between "dragging" and "settled" visuals near either end.
+  const rawThingsPx = (1 - position) * viewportHeight;
+  const thingsSizePx = Math.min(Math.max(rawThingsPx, SLIVER_PX), viewportHeight - SLIVER_PX);
+  const hizzelSizePx = viewportHeight - thingsSizePx;
 
+  const diptychMode: WorldMode = isDesktopWidth ? "desktop" : "landscape";
+  const thingsMode: WorldMode = isDiptych ? diptychMode : stop === 0.5 ? "mid" : stop === 0 ? "full" : "sliver";
+  const hizzelMode: WorldMode = isDiptych ? diptychMode : stop === 0.5 ? "mid" : stop === 1 ? "full" : "sliver";
+
+  // Vertical equivalent of the old horizontal bar-drag: three equal-height
+  // tap targets (one per stop), drag-to-nearest-stop otherwise. Portrait
+  // only — isDiptych ignores this whole mechanism, same as desktop always
+  // has.
   function startBarDrag(e: React.PointerEvent<HTMLDivElement>) {
     e.preventDefault();
     if (animationRef.current) clearTimeout(animationRef.current);
-    const startX = e.clientX;
+    const startY = e.clientY;
     const startPosition = position;
     const rect = e.currentTarget.getBoundingClientRect();
-    // Three equal-width tap targets, one per stop — a plain tap jumps
-    // straight to whichever segment was tapped.
-    const tappedThird = Math.min(2, Math.max(0, Math.floor((3 * (startX - rect.left)) / rect.width)));
+    const tappedThird = Math.min(2, Math.max(0, Math.floor((3 * (startY - rect.top)) / rect.height)));
     const tappedStop = ([0, 0.5, 1] as const)[tappedThird];
     let moved = false;
 
     function handleMove(ev: PointerEvent) {
-      const dx = ev.clientX - startX;
-      if (Math.abs(dx) > MOVE_THRESHOLD_PX) moved = true;
-      const next = Math.min(1, Math.max(0, startPosition + dx / window.innerWidth));
+      const dy = ev.clientY - startY;
+      if (Math.abs(dy) > MOVE_THRESHOLD_PX) moved = true;
+      const next = Math.min(1, Math.max(0, startPosition + dy / window.innerHeight));
       setPosition(next);
     }
 
@@ -103,8 +142,8 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" }) 
         return;
       }
 
-      const dx = ev.clientX - startX;
-      const finalRaw = Math.min(1, Math.max(0, startPosition + dx / window.innerWidth));
+      const dy = ev.clientY - startY;
+      const finalRaw = Math.min(1, Math.max(0, startPosition + dy / window.innerHeight));
       animateTo(nearestStop(finalRaw));
     }
 
@@ -113,92 +152,62 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" }) 
   }
 
   return (
-    <div className="relative flex h-dvh w-dvw overflow-hidden">
+    <div className="relative flex h-dvh w-dvw flex-col overflow-hidden max-lg:landscape:flex-row lg:flex-row">
       <ThingsWorld
-        widthPx={thingsWidthPx}
+        mode={thingsMode}
+        sizePx={thingsSizePx}
         onJumpToHizzel={() => animateTo(1)}
-        // At the full "Things" stop the Mid panel's room thumbnails are
-        // still in the DOM but zero-width and pointer-events-none, so a
-        // card drag has no room to land on at all. Reveal the Mid split
-        // the instant a drag actually starts so there's always a drop
-        // target — a no-op on desktop, where position is ignored in favor
-        // of the fixed 50/50 layout.
+        // At the Full-Things stop, the Hizzel sliver below is a static
+        // preview, not a real canvas — a card drag started there still has
+        // nowhere real to land. Reveal Mid the instant a drag begins, same
+        // reasoning as before, just retargeted to the vertical axis.
         onDragStart={() => {
-          if (stop === 0) animateTo(0.5);
+          if (!isDiptych && stop === 0) animateTo(0.5);
         }}
       />
-      <HizzelWorld widthPx={hizzelWidthPx} mobileActive={stop === 1} />
-      <HizzelMidPanel
-        widthPx={hizzelWidthPx}
-        mobileActive={stop !== 1}
-        onExpand={() => animateTo(1)}
-      />
+      <HizzelWorld mode={hizzelMode} sizePx={hizzelSizePx} onJumpToFull={() => animateTo(1)} />
 
-      {position > 0 && position < 1 && (
+      {/* The divide: drag handle + stop-jump arrows + "My Hizzel" pill.
+          Portrait only — landscape and desktop both show both worlds
+          permanently, nothing to divide between. */}
+      {!isDiptych && (
         <div
-          className="pointer-events-none absolute inset-y-0 z-10 w-px bg-[rgba(100,95,88,0.2)] lg:hidden"
-          style={{ left: `${thingsWidthPercent}%` }}
-        />
+          onPointerDown={startBarDrag}
+          className="absolute inset-x-0 z-30 flex touch-none items-center justify-center"
+          style={{ top: `${thingsSizePx}px`, height: 0 }}
+        >
+          <div className="absolute left-5 flex flex-col items-center gap-0.5 rounded-2xl bg-[#2C2A25] px-2 py-1.5 shadow-lg">
+            {stop !== 0 && (
+              <svg width="14" height="8" viewBox="0 0 14 8" fill="none" className="shrink-0">
+                <path d="M1 7L7 1L13 7" stroke="#F5F2EC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+            {stop === 0.5 && <div className="h-px w-3.5 bg-[rgba(245,242,236,0.25)]" />}
+            {stop !== 1 && (
+              <svg width="14" height="8" viewBox="0 0 14 8" fill="none" className="shrink-0">
+                <path d="M1 1L7 7L13 1" stroke="#F5F2EC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setMyHizzelOpen(true)}
+            aria-label="Open My Hizzel"
+            className="pointer-events-auto flex items-center rounded-full bg-linen px-5 py-2 font-serif text-xs text-linen-ink shadow-[0_4px_14px_rgba(20,18,14,0.32)]"
+          >
+            My Hizzel
+          </button>
+        </div>
       )}
 
-      <div
-        onPointerDown={startBarDrag}
-        className="fixed bottom-7 left-1/2 z-30 flex w-[220px] -translate-x-1/2 touch-none gap-0.5 rounded-full bg-[#2A2820] p-[3px] shadow-lg lg:hidden"
-      >
-        <div
-          className={`flex-1 rounded-full py-2 text-center font-display-italic text-sm transition-colors ${
-            stop === 0 ? "bg-white text-[#1A1814]" : "text-white/35"
-          }`}
-        >
-          Things
-        </div>
-        <div
-          className={`flex flex-1 items-center justify-center gap-1 rounded-full transition-colors ${
-            stop === 0.5 ? "bg-white/15" : ""
-          }`}
-        >
-          <div
-            className={`h-0 w-0 border-y-4 border-r-[6px] border-y-transparent ${
-              stop === 0.5 ? "border-r-white/80" : "border-r-white/30"
-            }`}
-          />
-          <div
-            className={`h-0 w-0 border-y-4 border-l-[6px] border-y-transparent ${
-              stop === 0.5 ? "border-l-white/80" : "border-l-white/30"
-            }`}
-          />
-        </div>
-        <div
-          className={`flex-1 rounded-full py-2 text-center font-serif text-[13px] tracking-[0.05em] transition-colors ${
-            stop === 1 ? "bg-white text-[#1A1814]" : "text-white/35"
-          }`}
-        >
-          Hizzel
-        </div>
-      </div>
-
-      {/* Mobile-only equivalent of the desktop "My Hizzel" pill below —
-          same styling, sitting just above the three-stop slider instead of
-          replacing it, since the slider already owns bottom-7 on mobile.
-          Previously the logo icon inside each world was the only way in on
-          mobile, easy to miss. */}
-      {move && (
+      {/* Desktop's own "My Hizzel" pill also covers landscape now — same
+          treatment, just gated on isDiptych rather than a bare lg: class. */}
+      {move && isDiptych && (
         <button
           type="button"
           onClick={() => setMyHizzelOpen(true)}
           aria-label="Open My Hizzel"
-          className="fixed bottom-20 left-1/2 z-30 flex -translate-x-1/2 items-center rounded-full bg-dark-ink px-5 py-2.5 font-serif text-[13px] tracking-[0.02em] whitespace-nowrap text-dark shadow-lg lg:hidden"
-        >
-          My Hizzel
-        </button>
-      )}
-
-      {move && (
-        <button
-          type="button"
-          onClick={() => setMyHizzelOpen(true)}
-          aria-label="Open My Hizzel"
-          className="fixed bottom-7 left-1/2 z-30 hidden -translate-x-1/2 items-center rounded-full bg-dark-ink px-5 py-2.5 font-serif text-[13px] tracking-[0.02em] whitespace-nowrap text-dark shadow-lg lg:flex"
+          className="fixed bottom-7 left-1/2 z-30 flex -translate-x-1/2 items-center rounded-full bg-dark-ink px-5 py-2.5 font-serif text-[13px] tracking-[0.02em] whitespace-nowrap text-dark shadow-lg"
         >
           My Hizzel
         </button>
