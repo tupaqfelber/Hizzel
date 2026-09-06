@@ -395,11 +395,14 @@ export function ThingsWorld({
         // below for a while — that treatment was only ever meant for
         // portrait, which has the vertical space to spare; desktop never
         // did.
-        <div className="mb-3 flex items-center gap-1.5 overflow-x-auto px-9 [scrollbar-width:none]">
+        <div className="mb-3 flex items-center gap-1.5 px-9">
+          {/* Button + search stay put — only the category pills scroll
+              horizontally, in their own nested overflow container, not
+              this whole row. */}
           <button
             type="button"
             onClick={() => setSheetState({ mode: "add" })}
-            className="flex shrink-0 items-center gap-1 rounded-[10px] border-[0.5px] border-linen-ink/10 bg-linen-ink/[.07] px-3.5 py-[7px] text-[11px] font-medium whitespace-nowrap text-linen-ink-secondary"
+            className="flex shrink-0 items-center gap-1 rounded-[10px] bg-linen-ink px-3.5 py-[7px] text-[11px] font-medium whitespace-nowrap text-linen"
           >
             <IconPlus size={12} /> Thing
           </button>
@@ -410,14 +413,16 @@ export function ThingsWorld({
             size="md"
             onClick={() => setSearchOpen((v) => !v)}
           />
-          <Pill size="sm" active={category === "All"} onClick={() => setCategory("All")}>
-            All
-          </Pill>
-          {CATEGORIES.map((c) => (
-            <Pill key={c} size="sm" active={category === c} onClick={() => setCategory(c)}>
-              {c}
+          <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none]">
+            <Pill size="sm" active={category === "All"} onClick={() => setCategory("All")}>
+              All
             </Pill>
-          ))}
+            {CATEGORIES.map((c) => (
+              <Pill key={c} size="sm" active={category === c} onClick={() => setCategory(c)}>
+                {c}
+              </Pill>
+            ))}
+          </div>
         </div>
       ) : useCompactControls ? (
         // Landscape / portrait-Mid: search, categories, and a small
