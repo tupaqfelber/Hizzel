@@ -86,7 +86,7 @@ export default function LoginPage() {
         <p className="mb-12 text-center text-[13px] leading-[1.5] text-linen-ink-tertiary">
           Your things. Your homes.
           <br />
-          Your moves, made simple.
+          Your moves, Made simple.
         </p>
 
         {step === "email" ? (

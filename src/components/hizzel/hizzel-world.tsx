@@ -203,7 +203,11 @@ export function HizzelWorld({
     measureCanvas();
   }, [sizePx, mode]);
 
-  const scale = computeCanvasScale(rooms ?? [], canvasSize.width, canvasSize.height);
+  // 32px of padding on a big desktop panel is unnoticeable; the same 32px
+  // on a narrow mobile half-screen (landscape/mid/full) eats a much bigger
+  // share of the already-tight space the plan has to work with.
+  const canvasPaddingPx = mode === "desktop" ? 32 : 16;
+  const scale = computeCanvasScale(rooms ?? [], canvasSize.width, canvasSize.height, canvasPaddingPx);
 
   const roomIdSet = new Set((rooms ?? []).map((r) => r.id));
   // The tray is a stable, EXPLICIT set — not "everything unassigned" (that's

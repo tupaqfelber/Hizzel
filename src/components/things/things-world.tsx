@@ -387,7 +387,39 @@ export function ThingsWorld({
         )}
       </div>
 
-      {useCompactControls ? (
+      {mode === "desktop" ? (
+        // Desktop's own arrangement — a small "+Thing" button at the far
+        // left of the row (mirroring Hizzel's own "+Room" sitting at the
+        // far right of its toolbar), then search, then categories. Was
+        // accidentally sharing portrait-Full's big full-width button
+        // below for a while — that treatment was only ever meant for
+        // portrait, which has the vertical space to spare; desktop never
+        // did.
+        <div className="mb-3 flex items-center gap-1.5 overflow-x-auto px-9 [scrollbar-width:none]">
+          <button
+            type="button"
+            onClick={() => setSheetState({ mode: "add" })}
+            className="flex shrink-0 items-center gap-1 rounded-[10px] border-[0.5px] border-linen-ink/10 bg-linen-ink/[.07] px-3.5 py-[7px] text-[11px] font-medium whitespace-nowrap text-linen-ink-secondary"
+          >
+            <IconPlus size={12} /> Thing
+          </button>
+          <IconButton
+            icon={IconSearch}
+            label="Search"
+            shape="square"
+            size="md"
+            onClick={() => setSearchOpen((v) => !v)}
+          />
+          <Pill size="sm" active={category === "All"} onClick={() => setCategory("All")}>
+            All
+          </Pill>
+          {CATEGORIES.map((c) => (
+            <Pill key={c} size="sm" active={category === c} onClick={() => setCategory(c)}>
+              {c}
+            </Pill>
+          ))}
+        </div>
+      ) : useCompactControls ? (
         // Landscape / portrait-Mid: search, categories, and a small
         // inline "+Thing" pill all share one row — matches
         // hizzel_landscape_v3 / hizzel_portrait_mid_v4 exactly.
@@ -416,20 +448,17 @@ export function ThingsWorld({
           </button>
         </div>
       ) : (
-        // Desktop (unchanged) and portrait-Full (the new "v4" treatment):
-        // search + full category list on one row, then a full-width
-        // "+ Thing" button on its own row below.
+        // Portrait-Full only (the "v4" treatment): search + full category
+        // list on one row, then a full-width "+ Thing" button on its own
+        // row below — deliberate here, since Full is the one stop with
+        // vertical space to spend on it.
         <>
-          <div
-            className={`mb-3 flex items-center gap-1.5 overflow-x-auto px-5 [scrollbar-width:none] ${
-              mode === "desktop" ? "lg:px-9" : ""
-            }`}
-          >
+          <div className="mb-3 flex items-center gap-1.5 overflow-x-auto px-5 [scrollbar-width:none]">
             <IconButton
               icon={IconSearch}
               label="Search"
               shape="square"
-              size={mode === "desktop" ? "md" : "sm"}
+              size="sm"
               onClick={() => setSearchOpen((v) => !v)}
             />
             <Pill size="sm" active={category === "All"} onClick={() => setCategory("All")}>
@@ -441,7 +470,7 @@ export function ThingsWorld({
               </Pill>
             ))}
           </div>
-          <div className={`mb-3 px-5 ${mode === "desktop" ? "lg:px-9" : ""}`}>
+          <div className="mb-3 px-5">
             <button
               type="button"
               onClick={() => setSheetState({ mode: "add" })}

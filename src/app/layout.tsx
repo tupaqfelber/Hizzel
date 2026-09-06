@@ -24,7 +24,7 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   title: "Hizzel",
-  description: "Your things. Your homes. Your moves, made simple.",
+  description: "Your things. Your homes. Your moves, Made simple.",
 };
 
 // No user-scalable pinch/double-tap-zoom — this is an app-like canvas with
