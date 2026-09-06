@@ -774,12 +774,6 @@ export function HizzelWorld({
         <div className="absolute top-2.5 right-2.5 text-[9px] font-medium tracking-[0.1em] text-dark-ink/20">
           N ↑
         </div>
-        {/* TEMPORARY — debugging the landscape blank-canvas report. Remove
-            once diagnosed. */}
-        <div className="absolute bottom-1 left-1 z-40 rounded bg-black/70 px-1.5 py-0.5 font-mono text-[8px] leading-tight text-lime-400">
-          mode={mode} canvas={Math.round(canvasSize.width)}×{Math.round(canvasSize.height)} rooms=
-          {rooms === undefined ? "loading" : rooms.length} scale={scale.pxPerCm.toFixed(3)}
-        </div>
         {rooms?.map((room) => (
           <RoomBlock
             key={room.id}
