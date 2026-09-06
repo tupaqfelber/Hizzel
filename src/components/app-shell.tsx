@@ -172,7 +172,16 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
   }
 
   return (
-    <div className="relative flex h-dvh w-dvw flex-col overflow-hidden max-lg:landscape:flex-row lg:flex-row">
+    // Row/column is driven by the same isDiptych JS state that decides
+    // `mode` for both children, not a separate CSS orientation media query
+    // — a real device's window.innerHeight shifts as Safari's toolbar
+    // shows/hides, which can transiently disagree with the `orientation`
+    // media feature. When those two signals disagreed, HizzelWorld would
+    // render mode="landscape" (width:50%,height:100%) while its actual
+    // parent was still column-flex — a live report showed exactly this:
+    // the canvas measured a stale, portrait-shaped size despite mode
+    // correctly reading "landscape". One source of truth for both settles it.
+    <div className={`relative flex h-dvh w-dvw overflow-hidden ${isDiptych ? "flex-row" : "flex-col"}`}>
       <ThingsWorld
         mode={thingsMode}
         sizePx={thingsSizePx}
@@ -218,9 +227,11 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
             // to show this bar is draggable.
             <div className="pointer-events-none absolute left-5 h-1 w-8 rounded-full bg-[rgba(245,242,236,0.35)]" />
           ) : (
-            // At either full stop, a down-chevron always means "collapse
-            // back to the balanced Mid view" — a universal retreat cue, not
-            // a literal pointer toward Things/Hizzel.
+            // A directional chevron pointing toward Things when at
+            // Full-Things (stop 0) and toward Hizzel when at Full-Hizzel
+            // (stop 1) — matches the drag gesture's own corrected sign:
+            // dragging down grows Things, so from Full-Things the "back to
+            // Mid" direction is up, and from Full-Hizzel it's down.
             <button
               type="button"
               onPointerDown={(e) => e.stopPropagation()}
@@ -229,7 +240,13 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
               className="pointer-events-auto absolute left-5 flex items-center justify-center rounded-2xl bg-[#2C2A25] p-2 shadow-lg"
             >
               <svg width="14" height="8" viewBox="0 0 14 8" fill="none" className="shrink-0">
-                <path d="M1 1L7 7L13 1" stroke="#F5F2EC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d={stop === 0 ? "M1 7L7 1L13 7" : "M1 1L7 7L13 1"}
+                  stroke="#F5F2EC"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </button>
           )}
