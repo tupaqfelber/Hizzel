@@ -3,5 +3,5 @@
 import { AppShell } from "@/components/app-shell";
 
 export default function ThingsPage() {
-  return <AppShell initialStop="things" />;
+  return <AppShell initialStop="mid" />;
 }

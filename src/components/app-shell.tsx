@@ -7,6 +7,7 @@ import { MyHizzelOverlay } from "@/components/my-hizzel/my-hizzel-overlay";
 import { PaywallSheet } from "@/components/billing/paywall-sheet";
 import { useCurrentMove } from "@/hooks/use-current-move";
 import { useIdentifyUser } from "@/hooks/use-identify-user";
+import { useIsomorphicLayoutEffect } from "@/hooks/use-isomorphic-layout-effect";
 
 const MOVE_THRESHOLD_PX = 5;
 const SNAP_DURATION_MS = 250;
@@ -20,6 +21,11 @@ const DESKTOP_BREAKPOINT_PX = 1024;
 // it to nothing — the whole point of the sliver is a permanent reminder
 // the other world still exists, one tap/swipe away.
 const SLIVER_PX = 84;
+// The divide's drag/tap hit area is a real DIVIDE_HIT_PX-tall strip centred
+// on the seam, not a height:0 sliver — startBarDrag's tapped-third math
+// divides by its own bounding rect's height, so a zero-height rect made
+// every tap on it resolve to NaN and silently do nothing.
+const DIVIDE_HIT_PX = 64;
 
 // Portrait's three resting stops. Landscape and desktop ignore this
 // entirely — both worlds are always fully visible there, no slider at all.
@@ -44,11 +50,11 @@ function easeOutCubic(t: number) {
 // same five-value type for consistency between the two components.
 export type WorldMode = "desktop" | "landscape" | "full" | "mid" | "sliver";
 
-export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" }) {
+export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "mid" }) {
   useIdentifyUser();
   const { data: move } = useCurrentMove();
   const [myHizzelOpen, setMyHizzelOpen] = useState(false);
-  const [position, setPosition] = useState(initialStop === "hizzel" ? 1 : 0);
+  const [position, setPosition] = useState(initialStop === "hizzel" ? 1 : initialStop === "things" ? 0 : 0.5);
   const [viewportHeight, setViewportHeight] = useState(0);
   // Desktop (>=1024px) and mobile landscape both get the always-visible
   // diptych, just at different sizing tiers (CSS's own lg: vs
@@ -59,7 +65,15 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" }) 
   const isDiptych = isDesktopWidth || isLandscape;
   const animationRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
+  // Layout effect, not a plain effect: this needs to settle *before* the
+  // first paint, not after — HizzelWorld's own canvas-size effect (also a
+  // layout effect, see hizzel-world.tsx) reads the `mode` this produces,
+  // and layout effects run parent-before-child in the same pre-paint pass.
+  // A plain effect here would let the very first paint (and the canvas's
+  // own first measurement) happen against the SSR-safe "not landscape yet"
+  // fallback mode, then correct a frame later — by which point the canvas
+  // had already cached a measurement from the wrong, transient geometry.
+  useIsomorphicLayoutEffect(() => {
     function update() {
       setViewportHeight(window.innerHeight);
       setIsDesktopWidth(window.innerWidth >= DESKTOP_BREAKPOINT_PX);
@@ -156,7 +170,10 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" }) 
       <ThingsWorld
         mode={thingsMode}
         sizePx={thingsSizePx}
-        onJumpToHizzel={() => animateTo(1)}
+        // The Things sliver (visible at Full-Hizzel) always returns to the
+        // balanced Mid view, not all the way to Full-Things — same "one tap
+        // gets you back to seeing both worlds" behaviour as the arrow pill.
+        onJumpToHizzel={() => animateTo(0.5)}
         // At the Full-Things stop, the Hizzel sliver below is a static
         // preview, not a real canvas — a card drag started there still has
         // nowhere real to land. Reveal Mid the instant a drag begins, same
@@ -165,32 +182,67 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" }) 
           if (!isDiptych && stop === 0) animateTo(0.5);
         }}
       />
-      <HizzelWorld mode={hizzelMode} sizePx={hizzelSizePx} onJumpToFull={() => animateTo(1)} />
+      <HizzelWorld mode={hizzelMode} sizePx={hizzelSizePx} onJumpToFull={() => animateTo(0.5)} />
 
       {/* The divide: drag handle + stop-jump arrows + "My Hizzel" pill.
           Portrait only — landscape and desktop both show both worlds
-          permanently, nothing to divide between. */}
+          permanently, nothing to divide between. The drag handle is a real
+          DIVIDE_HIT_PX-tall hit area centred on the seam (not a height:0
+          sliver) — startBarDrag's tapped-third math divides by its own
+          rect.height, so a zero-height rect broke every tap silently. */}
       {!isDiptych && (
         <div
           onPointerDown={startBarDrag}
           className="absolute inset-x-0 z-30 flex touch-none items-center justify-center"
-          style={{ top: `${thingsSizePx}px`, height: 0 }}
+          style={{ top: `${thingsSizePx - DIVIDE_HIT_PX / 2}px`, height: `${DIVIDE_HIT_PX}px` }}
         >
-          <div className="absolute left-5 flex flex-col items-center gap-0.5 rounded-2xl bg-[#2C2A25] px-2 py-1.5 shadow-lg">
-            {stop !== 0 && (
-              <svg width="14" height="8" viewBox="0 0 14 8" fill="none" className="shrink-0">
-                <path d="M1 7L7 1L13 7" stroke="#F5F2EC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-            {stop === 0.5 && <div className="h-px w-3.5 bg-[rgba(245,242,236,0.25)]" />}
-            {stop !== 1 && (
-              <svg width="14" height="8" viewBox="0 0 14 8" fill="none" className="shrink-0">
-                <path d="M1 1L7 7L13 1" stroke="#F5F2EC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+          <div className="pointer-events-none absolute left-5 flex flex-col items-center gap-0.5 rounded-2xl bg-[#2C2A25] px-2 py-1.5 shadow-lg">
+            {stop === 0.5 ? (
+              <>
+                <button
+                  type="button"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => animateTo(0)}
+                  aria-label="Expand My Things"
+                  className="pointer-events-auto flex items-center justify-center p-1"
+                >
+                  <svg width="14" height="8" viewBox="0 0 14 8" fill="none" className="shrink-0">
+                    <path d="M1 7L7 1L13 7" stroke="#F5F2EC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <div className="h-px w-3.5 bg-[rgba(245,242,236,0.25)]" />
+                <button
+                  type="button"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => animateTo(1)}
+                  aria-label="Expand Hizzel"
+                  className="pointer-events-auto flex items-center justify-center p-1"
+                >
+                  <svg width="14" height="8" viewBox="0 0 14 8" fill="none" className="shrink-0">
+                    <path d="M1 1L7 7L13 1" stroke="#F5F2EC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </>
+            ) : (
+              // At either full stop, a single down-chevron always means
+              // "collapse back to the balanced Mid view" — a universal
+              // retreat cue, not a literal pointer toward Things/Hizzel.
+              <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => animateTo(0.5)}
+                aria-label="Back to My Things and Hizzel side by side"
+                className="pointer-events-auto flex items-center justify-center p-1"
+              >
+                <svg width="14" height="8" viewBox="0 0 14 8" fill="none" className="shrink-0">
+                  <path d="M1 1L7 7L13 1" stroke="#F5F2EC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
             )}
           </div>
           <button
             type="button"
+            onPointerDown={(e) => e.stopPropagation()}
             onClick={() => setMyHizzelOpen(true)}
             aria-label="Open My Hizzel"
             className="pointer-events-auto flex items-center rounded-full bg-linen px-5 py-2 font-serif text-xs text-linen-ink shadow-[0_4px_14px_rgba(20,18,14,0.32)]"

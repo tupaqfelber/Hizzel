@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { useIsomorphicLayoutEffect } from "@/hooks/use-isomorphic-layout-effect";
 import {
   IconPlus,
   IconUpload,
@@ -154,7 +155,7 @@ export function HizzelWorld({
     setCanvasSize({ width: rect.width, height: rect.height });
   }
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (!canvasRef.current) return;
     const el = canvasRef.current;
     const observer = new ResizeObserver(() => measureCanvas());
@@ -166,8 +167,13 @@ export function HizzelWorld({
   // The portrait 3-stop slider changes this world's height continuously
   // (every live drag pointermove, and every step of the snap-to-stop
   // animation) — re-measure each time so the room/item scale never uses a
-  // stale size.
-  useEffect(() => {
+  // stale size. Layout effect (not a plain effect), same reasoning as
+  // AppShell's own orientation detection: this needs to re-measure using
+  // the corrected `mode`/sizing *before* paint, not after — otherwise a
+  // mode change (e.g. rotating into landscape) can paint once against the
+  // still-transitioning layout, caching a near-zero size that only a later
+  // real resize would ever correct.
+  useIsomorphicLayoutEffect(() => {
     measureCanvas();
   }, [sizePx, mode]);
 
