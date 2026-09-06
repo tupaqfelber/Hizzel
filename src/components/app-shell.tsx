@@ -83,7 +83,24 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
     }
     update();
     window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+    // iOS Safari's `resize` event is unreliable specifically around a
+    // rotation: it can fire while the address-bar chrome is still
+    // animating, reporting innerWidth/innerHeight from a half-settled
+    // layout rather than the final one — a live report showed exactly
+    // this (rotating while Full-Hizzel produced a too-narrow landscape
+    // width). `orientationchange` fires on the rotation itself, and a
+    // couple of delayed re-checks afterward catch whatever `resize`
+    // reported too early, once the chrome has actually finished settling.
+    function handleOrientationChange() {
+      update();
+      setTimeout(update, 120);
+      setTimeout(update, 400);
+    }
+    window.addEventListener("orientationchange", handleOrientationChange);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", handleOrientationChange);
+    };
   }, []);
 
   useEffect(() => {

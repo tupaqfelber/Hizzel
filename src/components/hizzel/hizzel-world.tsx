@@ -201,6 +201,18 @@ export function HizzelWorld({
   // real resize would ever correct.
   useIsomorphicLayoutEffect(() => {
     measureCanvas();
+    // Belt-and-suspenders for real device rotation specifically: a live
+    // report showed the landscape canvas coming out too narrow after
+    // rotating while Full-Hizzel, on a real phone only (unreproducible
+    // via simulated viewport resizes) — consistent with iOS Safari's
+    // address-bar chrome still animating when `mode`/`sizePx` first
+    // update. These catch a size that only settles a beat later.
+    const t1 = setTimeout(measureCanvas, 150);
+    const t2 = setTimeout(measureCanvas, 450);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
   }, [sizePx, mode]);
 
   // 32px of padding on a big desktop panel is unnoticeable; the same 32px
