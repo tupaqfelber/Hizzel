@@ -63,10 +63,11 @@ export default function WelcomePage() {
         </p>
         <p className="mb-2.5 font-display-italic text-[13.5px] italic leading-[1.5] text-amber-ink/[.85]">
           When you&rsquo;re ready, go to{" "}
-          <b className="font-semibold not-italic text-amber-ink">My Hizzel</b> and start
-          visualising your new home. Add all your own things. Upload your floor plans or
-          type in your rooms, and start your house move today. When you&rsquo;ve decided
-          where it all goes, share the plan with any move-day helpers.
+          <b className="font-semibold not-italic text-amber-ink">My Hizzel</b>{" "}
+          and start visualising your new home. Add all your own things. Upload your
+          floor plans or type in your rooms, and start your house move today. When
+          you&rsquo;ve decided where it all goes, share the plan with friends, family
+          or anyone helping you on the big move day.
         </p>
         <p className="font-display-italic text-[13.5px] italic leading-[1.5] text-amber-ink/[.85]">
           Good luck with this next chapter, and let us know if there&rsquo;s any way
