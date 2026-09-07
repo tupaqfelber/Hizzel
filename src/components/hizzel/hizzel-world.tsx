@@ -501,10 +501,19 @@ export function HizzelWorld({
   // transparently creates a first area on demand so the button always
   // works, matching "the clear, obvious path for anyone without a plan".
   async function handleAddRoomClick() {
-    // Deliberately accountUnlocked, not hizzelUnlocked — adding a room /
-    // uploading a plan is the actual paid feature, not just trying the
-    // example out. Everything else in this file uses the example-exempt
-    // value; these two don't.
+    // The example move's own rooms are seeded, fixed content — building
+    // real rooms on top of it is a trap: "+ New move" archives it and
+    // starts fresh, so anything added here just quietly stops being the
+    // move you're looking at, reading as if it vanished. Caught before
+    // the accountUnlocked check below, which doesn't care about
+    // is_example at all here (unlike everywhere else in this file) since
+    // adding a room is the actual paid feature, not just trying the
+    // example out — so a paying account would otherwise sail straight
+    // past that check and hit exactly this trap.
+    if (move?.is_example) {
+      window.alert('To add your own rooms, start a "New move" in My Hizzel first — anything built on this example won\'t carry over.');
+      return;
+    }
     if (!accountUnlocked) {
       usePaywallStore.getState().open();
       return;
@@ -525,6 +534,16 @@ export function HizzelWorld({
   }
 
   function handlePlanButtonClick() {
+    // Same trap as handleAddRoomClick, and a worse version of it — a real
+    // report: uploading a plan onto the example move, then starting a
+    // "New move" afterward, reads as "it deleted the plan I uploaded"
+    // (it didn't; it archived the example move the plan actually belongs
+    // to, same as the rooms case, just easier to mistake for the plan
+    // itself being lost since it was the user's own real plan this time).
+    if (move?.is_example) {
+      window.alert('To upload your first house plan, start a "New move" in My Hizzel first — anything built on this example won\'t carry over.');
+      return;
+    }
     // Deliberately accountUnlocked, not hizzelUnlocked — see
     // handleAddRoomClick's comment above.
     if (!accountUnlocked) {
@@ -622,7 +641,7 @@ export function HizzelWorld({
             <button
               type="button"
               onClick={() => setAreaDropdownOpen((v) => !v)}
-              className="mt-[3px] flex items-center gap-1 text-[11px] text-dark-ink-tertiary lg:justify-end"
+              className="mt-[3px] flex items-center gap-1 text-[11px] text-dark-ink lg:justify-end"
             >
               {selectedArea?.name ?? "No area yet"}
               <IconChevronDown size={10} />

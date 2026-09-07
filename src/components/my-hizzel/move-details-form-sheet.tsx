@@ -56,7 +56,7 @@ export function MoveDetailsFormSheet({
           <InputField
             value={moverName}
             onChange={(e) => setMoverName(e.target.value)}
-            placeholder="e.g. Reeves Britannia"
+            placeholder="e.g. Dreamhizzle Moving Company"
           />
 
           <FieldLabel>Mover phone</FieldLabel>

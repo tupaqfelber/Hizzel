@@ -19,7 +19,10 @@ export function AreaDropdown({
           type="button"
           onClick={() => onSelect(area.id)}
           className={`block w-full px-4 py-2.5 text-left text-sm ${
-            area.id === selectedAreaId ? "text-dark-ink" : "text-dark-ink-secondary"
+            // The current area reads dimmed — it's already what's showing,
+            // not something there's a reason to tap again. Every other
+            // (actually selectable) area gets the full-strength color.
+            area.id === selectedAreaId ? "text-dark-ink-secondary" : "text-dark-ink"
           }`}
         >
           {area.name}
