@@ -12,8 +12,10 @@ import {
   IconHome,
   IconHome2,
   IconChevronRight,
+  IconShare,
 } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/client";
+import { formatDate } from "@/lib/format-date";
 import {
   useCurrentMove,
   useOtherMoves,
@@ -30,14 +32,6 @@ const ROLE_GRADIENT = {
   current: "linear-gradient(135deg,#C8A882,#B8986F)",
   new: "linear-gradient(135deg,#9BA89A,#8A9889)",
 } as const;
-
-function formatDate(dateStr: string) {
-  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
 
 function daysToGo(dateStr: string) {
   const ms = new Date(dateStr + "T00:00:00").getTime() - new Date().setHours(0, 0, 0, 0);
@@ -100,6 +94,13 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   const startNewMove = useStartNewMove();
   const { hizzelUnlocked, product, cancelAtPeriodEnd, unlockedUntil } = useBillingStatus();
   const [subscriptionActionLoading, setSubscriptionActionLoading] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  // Same "free on the onboarding example, otherwise needs a subscription"
+  // exemption already duplicated in hizzel-world.tsx / things-world.tsx —
+  // this file's own `hizzelUnlocked` above is the raw billing status
+  // (used for the Subscription button's own label), so this is named
+  // separately rather than shadowing it.
+  const canGeneratePdf = hizzelUnlocked || !!move?.is_example;
 
   const current = move?.properties.find((p) => p.role === "current");
   const next = move?.properties.find((p) => p.role === "new");
@@ -122,6 +123,41 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   async function handleSignOut() {
     await supabase.auth.signOut();
     router.push("/login");
+  }
+
+  async function handleShare() {
+    if (!canGeneratePdf) {
+      usePaywallStore.getState().open();
+      return;
+    }
+    setPdfLoading(true);
+    try {
+      const res = await fetch("/api/things/pdf");
+      if (!res.ok) throw new Error(`PDF generation failed (${res.status})`);
+      const blob = await res.blob();
+      const filename = `${current?.nickname ?? "My"} to ${next?.nickname ?? "New"} - Things.pdf`;
+      const file = new File([blob], filename, { type: "application/pdf" });
+
+      // Real iOS Safari/Chrome support sharing files via the Web Share
+      // API — falls back to just opening the PDF (the browser's own PDF
+      // viewer, from which "Share"/"Save" is still reachable) wherever
+      // that's not available.
+      if (navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: "My Things" });
+        } catch (shareErr) {
+          // The user dismissing the native share sheet throws
+          // AbortError — expected, not a real failure.
+          if ((shareErr as Error)?.name !== "AbortError") throw shareErr;
+        }
+      } else {
+        window.open(URL.createObjectURL(blob), "_blank");
+      }
+    } catch (err) {
+      console.error("Couldn't generate the Things PDF", err);
+    } finally {
+      setPdfLoading(false);
+    }
   }
 
   async function handleSubscriptionClick() {
@@ -323,7 +359,7 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="flex h-[74px] shrink-0 items-center justify-center border-t border-amber-ink/15 pb-2.5">
-        <div className="flex w-[280px] gap-0.5 rounded-full bg-linen-ink/35 p-[3px]">
+        <div className="flex w-[340px] gap-0.5 rounded-full bg-linen-ink/35 p-[3px]">
           <button
             type="button"
             onClick={handleSubscriptionClick}
@@ -338,6 +374,15 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
           >
             Contact
           </a>
+          <button
+            type="button"
+            onClick={handleShare}
+            disabled={pdfLoading}
+            className="flex flex-1 items-center justify-center gap-1 rounded-full bg-amber-ink/[.18] py-2 text-center text-[11px] font-medium whitespace-nowrap text-amber-ink disabled:opacity-60"
+          >
+            <IconShare size={13} />
+            {pdfLoading ? "…" : "Share"}
+          </button>
           <button
             type="button"
             onClick={handleSignOut}

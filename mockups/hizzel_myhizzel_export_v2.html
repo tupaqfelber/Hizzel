@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>My Hizzel — Export Button Added</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Serif+Display&family=Playfair+Display:ital,wght@1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#3a2a18;display:flex;justify-content:center;padding:40px 0;font-family:'DM Sans',sans-serif;}
+
+.overlay{width:480px;background:linear-gradient(160deg,#A87238 0%,#8A5A28 100%);border-radius:28px;padding:38px 36px;box-shadow:0 20px 60px rgba(0,0,0,0.4);}
+
+.header-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;}
+.title{font-family:'DM Serif Display',serif;font-size:32px;color:#F5EEE1;}
+.close-btn{width:38px;height:38px;border-radius:50%;background:rgba(245,238,225,0.15);display:flex;align-items:center;justify-content:center;color:#F5EEE1;font-size:16px;}
+
+.section-label-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.section-label{font-size:10px;letter-spacing:0.1em;color:rgba(245,238,225,0.55);text-transform:uppercase;}
+.new-move-pill{display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:16px;border:1px dashed rgba(245,238,225,0.4);color:#F5EEE1;font-size:12px;}
+
+.move-title{font-family:'DM Serif Display',serif;font-size:26px;color:#F5EEE1;margin-bottom:8px;}
+.move-date{display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(245,238,225,0.75);margin-bottom:18px;}
+
+.props-row{display:flex;gap:12px;margin-bottom:22px;}
+.prop-card{flex:1;border-radius:14px;overflow:hidden;background:#F5EEE1;}
+.prop-tag{display:inline-block;margin:10px;padding:3px 9px;border-radius:5px;background:rgba(245,238,225,0.9);color:#5C3A18;font-size:9px;font-weight:600;letter-spacing:0.04em;}
+.prop-img{height:110px;display:flex;align-items:center;justify-content:center;}
+.prop-name{padding:12px 12px 3px;font-size:14px;font-weight:500;color:#2C2A25;}
+.prop-addr{padding:0 12px 12px;font-size:10px;color:#A09890;}
+
+.field-row{margin-bottom:16px;}
+.field-label{display:flex;align-items:center;gap:5px;font-size:9px;letter-spacing:0.08em;color:rgba(245,238,225,0.55);text-transform:uppercase;margin-bottom:4px;}
+.field-value{font-size:14px;color:#F5EEE1;padding-bottom:8px;border-bottom:0.5px solid rgba(245,238,225,0.25);}
+
+.footer-divider{height:0.5px;background:rgba(245,238,225,0.2);margin:20px 0 16px;}
+.footer-actions{display:flex;gap:8px;background:rgba(60,40,20,0.35);border-radius:24px;padding:6px;}
+.footer-btn{flex:1;text-align:center;padding:11px 4px;border-radius:18px;font-size:13px;color:#F5EEE1;white-space:nowrap;}
+.footer-btn-highlight{background:rgba(245,238,225,0.12);}
+</style>
+</head>
+<body>
+<div class="overlay">
+
+  <div class="header-row">
+    <div class="title">My Hizzel</div>
+    <div class="close-btn"><i class="ti ti-x"></i></div>
+  </div>
+
+  <div class="section-label-row">
+    <div class="section-label">Current Move</div>
+    <div class="new-move-pill"><i class="ti ti-plus" style="font-size:12px"></i> New move</div>
+  </div>
+
+  <div class="move-title">Hizzel Now &nbsp;&rarr;&nbsp; Hizzel New</div>
+  <div class="move-date"><i class="ti ti-calendar" style="font-size:13px"></i> 31 July 2027 &middot; 327 days to go</div>
+
+  <div class="props-row">
+    <div class="prop-card">
+      <div class="prop-tag">CURRENT</div>
+      <div class="prop-img" style="background:linear-gradient(160deg,#C7A578,#A0824F);"><i class="ti ti-home" style="font-size:34px;color:rgba(245,238,225,0.8);"></i></div>
+      <div class="prop-name">Hizzel Now</div>
+      <div class="prop-addr">No address yet</div>
+    </div>
+    <div class="prop-card">
+      <div class="prop-tag">NEW</div>
+      <div class="prop-img" style="background:linear-gradient(160deg,#A8B8AA,#7E9482);"><i class="ti ti-home" style="font-size:34px;color:rgba(245,238,225,0.8);"></i></div>
+      <div class="prop-name">Hizzel New</div>
+      <div class="prop-addr">No address yet</div>
+    </div>
+  </div>
+
+  <div class="field-row">
+    <div class="field-label"><i class="ti ti-truck" style="font-size:12px"></i> Mover</div>
+    <div class="field-value">Reeves Brittania</div>
+  </div>
+
+  <div class="field-row">
+    <div class="field-label"><i class="ti ti-note" style="font-size:12px"></i> Notes</div>
+    <div class="field-value">Add notes</div>
+  </div>
+
+  <div class="footer-divider"></div>
+
+  <div class="footer-actions">
+    <div class="footer-btn">Subscription</div>
+    <div class="footer-btn">Contact</div>
+    <div class="footer-btn footer-highlight" style="background:rgba(245,238,225,0.18);"><i class="ti ti-share" style="font-size:13px;margin-right:4px;"></i>Share</div>
+    <div class="footer-btn">Sign out</div>
+  </div>
+
+</div>
+</body>
+</html>
