@@ -8,7 +8,6 @@ import {
   IconUpload,
   IconLock,
   IconLockOpen,
-  IconSearch,
   IconChevronDown,
   IconRotate,
   IconPencil,
@@ -755,14 +754,6 @@ export function HizzelWorld({
             </button>
           </div>
         )}
-        <div className="flex-1" />
-        <button
-          type="button"
-          aria-label="Search"
-          className={`${hasSelection ? "hidden lg:flex" : "flex"} h-9 w-10 shrink-0 items-center justify-center rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] text-dark-ink-secondary`}
-        >
-          <IconSearch size={16} />
-        </button>
       </div>
 
       {uploadError && (
