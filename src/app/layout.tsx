@@ -25,6 +25,14 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Hizzel",
   description: "Your things. Your homes. Your moves, made simple.",
+  // Explicit label for the "Add to Home Screen" icon — the apple-icon.png
+  // file alongside this layout is what supplies the icon image itself
+  // (Next.js's own convention, same mechanism as icon.png for the regular
+  // favicon); this just makes sure the name under it is exactly "Hizzel"
+  // rather than however iOS chooses to fall back.
+  appleWebApp: {
+    title: "Hizzel",
+  },
 };
 
 // No user-scalable pinch/double-tap-zoom — this is an app-like canvas with
