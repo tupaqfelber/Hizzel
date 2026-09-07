@@ -17,6 +17,9 @@ export const config = {
     // signature header), so the auth gate would redirect it to /login
     // before the route's own signature check ever ran. Confirmed via
     // `stripe listen` logging every event as a 307 until this was added.
-    "/((?!_next/static|_next/image|favicon.ico|api/stripe/webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // manifest.webmanifest is excluded the same way image assets already
+    // were — Chrome fetches it unauthenticated to decide installability,
+    // and a 307-to-/login instead of real JSON silently breaks that.
+    "/((?!_next/static|_next/image|favicon.ico|manifest\\.webmanifest|api/stripe/webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

@@ -25,13 +25,26 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Hizzel",
   description: "Your things. Your homes. Your moves, made simple.",
-  // Explicit label for the "Add to Home Screen" icon — the apple-icon.png
-  // file alongside this layout is what supplies the icon image itself
-  // (Next.js's own convention, same mechanism as icon.png for the regular
-  // favicon); this just makes sure the name under it is exactly "Hizzel"
-  // rather than however iOS chooses to fall back.
+  // "capable" is what actually gets iOS Safari to launch the home-screen
+  // icon standalone (no address bar/browser chrome) instead of opening a
+  // normal Safari tab — the icon itself and this title come from the same
+  // apple-icon.png / appleWebApp block regardless. Only Safari honors
+  // this; Chrome on iOS has no standalone-launch mode at all (an Apple
+  // platform restriction — "Add to Home Screen" there just bookmarks back
+  // into Chrome's own UI, no web config changes that). Android Chrome
+  // (and desktop Chrome's "Install app") get their own standalone launch
+  // from manifest.ts instead, which Chrome actually does honor.
   appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
     title: "Hizzel",
+  },
+  // Next.js's own appleWebApp.capable only emits the newer, unprefixed
+  // "mobile-web-app-capable" tag — inconsistently honored on older iOS
+  // versions, which look for the legacy "apple-" prefixed name
+  // specifically. Adding both costs nothing and covers more devices.
+  other: {
+    "apple-mobile-web-app-capable": "yes",
   },
 };
 
@@ -44,6 +57,11 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // Matches manifest.ts's background_color/theme_color (--color-linen) —
+  // colors the browser's own UI (Android's toolbar, a standalone launch's
+  // brief blank frame before the app paints) instead of defaulting to
+  // white/black.
+  themeColor: "#f5f2ec",
 };
 
 export default function RootLayout({
