@@ -8,14 +8,17 @@ import { PaywallSheet } from "@/components/billing/paywall-sheet";
 import { useCurrentMove } from "@/hooks/use-current-move";
 import { useIdentifyUser } from "@/hooks/use-identify-user";
 import { useIsomorphicLayoutEffect } from "@/hooks/use-isomorphic-layout-effect";
+import { useDemoStore } from "@/hooks/use-demo-store";
 
 const MOVE_THRESHOLD_PX = 5;
 const SNAP_DURATION_MS = 250;
 // Below this width, "desktop" ends and the mobile orientation split
 // (landscape diptych vs portrait slider) takes over — matches Tailwind's
 // default `lg` breakpoint exactly, since every `lg:`-scoped class already
-// throughout the app assumes that boundary.
-const DESKTOP_BREAKPOINT_PX = 1024;
+// throughout the app assumes that boundary. Exported so welcome/page.tsx's
+// own desktop-vs-landscape check means exactly the same thing as it does
+// here, rather than a second hardcoded number drifting out of sync.
+export const DESKTOP_BREAKPOINT_PX = 1024;
 // A resting Full stop still leaves this much of the *other* world visible
 // as a compact "sliver" (logo + one line of context) rather than shrinking
 // it to nothing — the whole point of the sliver is a permanent reminder
@@ -53,7 +56,12 @@ export type WorldMode = "desktop" | "landscape" | "full" | "mid" | "sliver";
 export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "mid" }) {
   useIdentifyUser();
   const { data: move } = useCurrentMove();
+  const demoActive = useDemoStore((s) => s.active);
+  const demoOverlayOpen = useDemoStore((s) => s.overlayOpen);
   const [myHizzelOpen, setMyHizzelOpen] = useState(false);
+  // The script (demo-script.ts) opens/closes My Hizzel on its own cues —
+  // real taps still work exactly as before once the demo isn't active.
+  const effectiveMyHizzelOpen = demoActive ? demoOverlayOpen : myHizzelOpen;
   const [position, setPosition] = useState(initialStop === "hizzel" ? 1 : initialStop === "things" ? 0 : 0.5);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [viewportWidth, setViewportWidth] = useState(0);
@@ -63,7 +71,11 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
   // slider only exists for portrait, below the desktop breakpoint.
   const [isDesktopWidth, setIsDesktopWidth] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
-  const isDiptych = isDesktopWidth || isLandscape;
+  // The demo always runs in the split-screen view, regardless of the real
+  // device's actual size/orientation — it's mounted inside the same
+  // forced-landscape rotation wrapper welcome/page.tsx uses (see
+  // demo-player.tsx), so this just has to agree with that, not re-detect it.
+  const isDiptych = demoActive || isDesktopWidth || isLandscape;
   const animationRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Layout effect, not a plain effect: this needs to settle *before* the
@@ -309,7 +321,7 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
         </button>
       )}
 
-      {myHizzelOpen && <MyHizzelOverlay onClose={() => setMyHizzelOpen(false)} />}
+      {effectiveMyHizzelOpen && <MyHizzelOverlay onClose={() => setMyHizzelOpen(false)} />}
       <PaywallSheet />
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
 import {
@@ -27,6 +27,7 @@ import { PropertyFormSheet } from "@/components/my-hizzel/property-form-sheet";
 import { MoveDetailsFormSheet } from "@/components/my-hizzel/move-details-form-sheet";
 import { useBillingStatus } from "@/hooks/use-billing-status";
 import { usePaywallStore } from "@/hooks/use-paywall-store";
+import { useDemoStore } from "@/hooks/use-demo-store";
 
 const ROLE_GRADIENT = {
   current: "linear-gradient(135deg,#C8A882,#B8986F)",
@@ -102,6 +103,32 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   // separately rather than shadowing it.
   const canGeneratePdf = hizzelUnlocked || !!move?.is_example;
 
+  // Watch-demo's beat 7: the script sets pdfRequested once it wants "Share"
+  // to fire on its own, rather than a real tap — handleShare() below is the
+  // one code path either way, just branching its endpoint/behavior at the
+  // two points that genuinely differ (no billing gate, no native share
+  // sheet — that needs a real user gesture the autoplaying script doesn't
+  // have and would likely just throw).
+  const demoActive = useDemoStore((s) => s.active);
+  const demoPdfRequested = useDemoStore((s) => s.pdfRequested);
+  const [demoPdfBlobUrl, setDemoPdfBlobUrl] = useState<string | null>(null);
+  const demoPdfFiredRef = useRef(false);
+  // Tracked in state, not a ref (this project's lint config forbids
+  // touching a ref during render) — clears the previous run's PDF the
+  // instant a demo starts or ends, same "adjusting state when a prop
+  // changes" pattern as demo-plan-icon.tsx.
+  const [prevDemoActive, setPrevDemoActive] = useState(false);
+  if (demoActive !== prevDemoActive) {
+    setPrevDemoActive(demoActive);
+    setDemoPdfBlobUrl(null);
+  }
+
+  // demoPdfFiredRef only needs resetting between runs, not synchronized
+  // with render — an effect is the right place for a plain ref mutation.
+  useEffect(() => {
+    if (!demoActive) demoPdfFiredRef.current = false;
+  }, [demoActive]);
+
   const current = move?.properties.find((p) => p.role === "current");
   const next = move?.properties.find((p) => p.role === "new");
   const days = move?.move_date ? daysToGo(move.move_date) : null;
@@ -126,15 +153,25 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   }
 
   async function handleShare() {
-    if (!canGeneratePdf) {
+    if (!demoActive && !canGeneratePdf) {
       usePaywallStore.getState().open();
       return;
     }
     setPdfLoading(true);
     try {
-      const res = await fetch("/api/things/pdf");
+      const res = await fetch(demoActive ? "/api/things/pdf/demo" : "/api/things/pdf");
       if (!res.ok) throw new Error(`PDF generation failed (${res.status})`);
       const blob = await res.blob();
+
+      if (demoActive) {
+        // No navigator.share() here — it needs a direct user gesture,
+        // which this autoplaying script doesn't have (it would just throw).
+        // Displaying it inline is also a truer match for the brief:
+        // "generates and displays the finished document".
+        setDemoPdfBlobUrl(URL.createObjectURL(blob));
+        return;
+      }
+
       const filename = `${current?.nickname ?? "My"} to ${next?.nickname ?? "New"} - Things.pdf`;
       const file = new File([blob], filename, { type: "application/pdf" });
 
@@ -159,6 +196,18 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
       setPdfLoading(false);
     }
   }
+
+  // Fires handleShare() on the script's own cue instead of a tap — see the
+  // demoPdfRequested comment above. Guarded by a ref (not just the state
+  // dependencies) so React's dev-mode double-effect can't fire the fetch
+  // twice for the same request.
+  useEffect(() => {
+    if (demoActive && demoPdfRequested && !demoPdfFiredRef.current) {
+      demoPdfFiredRef.current = true;
+      handleShare();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demoActive, demoPdfRequested]);
 
   async function handleSubscriptionClick() {
     // Already cancelled-but-still-unlocked reads the same as no plan at
@@ -351,6 +400,19 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
                   </div>
                 ))}
               </>
+            )}
+
+            {demoActive && demoPdfBlobUrl && (
+              <div className="mt-5">
+                <div className="mb-2.5 text-[10px] font-medium tracking-[0.12em] text-amber-ink/50 uppercase">
+                  Things.pdf
+                </div>
+                <embed
+                  src={demoPdfBlobUrl}
+                  type="application/pdf"
+                  className="h-[240px] w-full rounded-[10px] bg-white"
+                />
+              </div>
             )}
           </>
         ) : (

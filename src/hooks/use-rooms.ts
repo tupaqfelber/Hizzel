@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { useDemoStore } from "@/hooks/use-demo-store";
 
 export interface RoomRow {
   id: string;
@@ -14,10 +15,12 @@ export interface RoomRow {
 
 export function useRooms(areaId: string | undefined) {
   const supabase = createClient();
+  const demo = useDemoStore((s) => s.active);
+  const demoRooms = useDemoStore((s) => s.rooms);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ["rooms", areaId],
-    enabled: !!areaId,
+    enabled: !!areaId && !demo,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("rooms")
@@ -28,6 +31,11 @@ export function useRooms(areaId: string | undefined) {
       return data as RoomRow[];
     },
   });
+
+  if (demo) {
+    return { ...query, data: demoRooms, isLoading: false, isPending: false, isError: false, error: null } as typeof query;
+  }
+  return query;
 }
 
 const ROOM_GAP_CM = 30;

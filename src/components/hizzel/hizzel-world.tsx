@@ -685,6 +685,10 @@ export function HizzelWorld({
           type="button"
           onClick={handlePlanButtonClick}
           disabled={extracting}
+          // The Watch-demo sequence's beat 4 (demo-plan-icon.tsx) animates
+          // a Houseplan icon flying into this exact button — a stable
+          // selector for that, nothing else reads it.
+          data-plan-button
           className="flex items-center gap-1 rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-3.5 py-[7px] text-[11px] font-medium whitespace-nowrap text-dark-tool-label disabled:opacity-60"
         >
           <IconUpload size={12} /> {extracting ? "Reading…" : "Plan"}

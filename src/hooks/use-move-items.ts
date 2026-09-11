@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { useDemoStore } from "@/hooks/use-demo-store";
 import type { ThingCategory } from "@/lib/supabase/types";
 
 export interface MoveItem {
@@ -65,10 +66,12 @@ interface PlacementsTable {
 
 export function useMoveItems(moveId: string | undefined) {
   const supabase = createClient();
+  const demo = useDemoStore((s) => s.active);
+  const demoMoveItems = useDemoStore((s) => s.moveItems);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ["move-items", moveId],
-    enabled: !!moveId,
+    enabled: !!moveId && !demo,
     queryFn: async () => {
       const [thingsRes, placementsRes] = await Promise.all([
         supabase
@@ -98,6 +101,11 @@ export function useMoveItems(moveId: string | undefined) {
       });
     },
   });
+
+  if (demo) {
+    return { ...query, data: demoMoveItems, isLoading: false, isPending: false, isError: false, error: null } as typeof query;
+  }
+  return query;
 }
 
 interface PlaceInput {

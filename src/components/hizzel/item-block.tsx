@@ -58,7 +58,12 @@ export function ItemBlock({
       }}
       onClick={(e) => e.stopPropagation()}
       className={`absolute z-[3] flex touch-none items-end justify-start overflow-hidden rounded-[3px] border border-dark px-[5px] py-[3px] ${
-        dragging ? "opacity-30" : ""
+        // No transition while a real pointer is actively dragging this
+        // block — it should follow the cursor exactly, not lag behind an
+        // easing curve. Otherwise (a room/position change landing from
+        // elsewhere, e.g. the Watch-demo sequence scripting an item into
+        // place) sliding in reads far better than an instant jump-cut.
+        dragging ? "opacity-30" : "transition-all duration-700 ease-out"
       } ${selected ? "ring-2 ring-dark-ink ring-offset-1 ring-offset-dark" : ""} ${flashing ? "animate-item-flash" : ""}`}
       style={
         {

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { useDemoStore } from "@/hooks/use-demo-store";
 
 export interface Area {
   id: string;
@@ -11,10 +12,12 @@ export interface Area {
 
 export function useAreas(propertyId: string | undefined) {
   const supabase = createClient();
+  const demo = useDemoStore((s) => s.active);
+  const demoAreas = useDemoStore((s) => s.areas);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ["areas", propertyId],
-    enabled: !!propertyId,
+    enabled: !!propertyId && !demo,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("areas")
@@ -25,6 +28,11 @@ export function useAreas(propertyId: string | undefined) {
       return data as Area[];
     },
   });
+
+  if (demo) {
+    return { ...query, data: demoAreas, isLoading: false, isPending: false, isError: false, error: null } as typeof query;
+  }
+  return query;
 }
 
 export function useCreateArea(propertyId: string | undefined) {

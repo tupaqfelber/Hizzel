@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { useDemoStore } from "@/hooks/use-demo-store";
 import type { PlanTier } from "@/lib/supabase/types";
 
 // hizzel_unlocked_until / hizzel_product / hizzel_cancel_at_period_end
@@ -41,9 +42,11 @@ const BILLING_ENABLED = process.env.NEXT_PUBLIC_BILLING_ENABLED === "true";
 
 export function useBillingStatus() {
   const supabase = createClient();
+  const demo = useDemoStore((s) => s.active);
 
   const query = useQuery({
     queryKey: ["billing-status"],
+    enabled: !demo,
     queryFn: async (): Promise<ProfileRow | null> => {
       const {
         data: { user },
@@ -60,7 +63,11 @@ export function useBillingStatus() {
     },
   });
 
+  // The demo should never look paywalled mid-script — same kill-switch
+  // treatment as NEXT_PUBLIC_BILLING_ENABLED=false below, just scoped to
+  // demo playback instead of the whole build.
   const hizzelUnlocked =
+    demo ||
     !BILLING_ENABLED ||
     (!!query.data?.hizzel_unlocked_until && new Date(query.data.hizzel_unlocked_until) > new Date());
 

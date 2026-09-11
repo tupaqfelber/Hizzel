@@ -42,7 +42,19 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (user && !isPublicPath && request.nextUrl.pathname !== "/welcome") {
+  // Un-onboarded users must always be able to reach /welcome itself and
+  // everything under it — that now includes /welcome/demo (the Watch-demo
+  // sequence every new signup needs to reach before ticking "onboarded")
+  // and its own PDF-generation route. An exact-match check missed both:
+  // visiting /welcome/demo 307'd straight back to /welcome, and its
+  // /api/things/pdf/demo fetch would have hit the same redirect and
+  // returned a login-page HTML response instead of a real PDF.
+  const isWelcomeFlow =
+    request.nextUrl.pathname === "/welcome" ||
+    request.nextUrl.pathname.startsWith("/welcome/") ||
+    request.nextUrl.pathname === "/api/things/pdf/demo";
+
+  if (user && !isPublicPath && !isWelcomeFlow) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("onboarded")

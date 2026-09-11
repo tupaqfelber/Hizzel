@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Demo Floorplan Icon v4 — Matching Sketch</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#E0DCD4;display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:'DM Sans',sans-serif;}
+
+/* Landscape file shape, folded top-right corner, matching sketch proportions */
+.file-icon{width:340px;height:210px;background:#FFFFFF;border-radius:16px;box-shadow:0 12px 36px rgba(20,18,14,0.2);position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;clip-path:polygon(0 0, 82% 0, 100% 18%, 100% 100%, 0 100%);}
+
+.fold{position:absolute;top:0;right:0;width:18%;aspect-ratio:1;background:#E0DCD4;clip-path:polygon(100% 0, 100% 100%, 0 0);}
+
+.pdf-badge{background:#C0392B;color:#fff;font-size:34px;font-weight:700;letter-spacing:0.03em;padding:16px 30px;border-radius:14px;}
+.caption{font-size:15px;font-weight:700;letter-spacing:0.04em;color:#2C2A25;text-transform:uppercase;}
+</style>
+</head>
+<body>
+<div class="file-icon">
+  <div class="fold"></div>
+  <div class="pdf-badge">PDF</div>
+  <div class="caption">Houseplan</div>
+</div>
+</body>
+</html>

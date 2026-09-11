@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { uploadThingPhoto } from "@/lib/storage";
+import { useDemoStore } from "@/hooks/use-demo-store";
 import type { ThingCategory } from "@/lib/supabase/types";
 
 export interface ThingItem {
@@ -62,10 +63,13 @@ interface PlacementsTable {
 
 export function useGroupedThings(moveId: string | undefined) {
   const supabase = createClient();
+  const demo = useDemoStore((s) => s.active);
+  const demoGroups = useDemoStore((s) => s.groups);
+  const demoTotalCount = useDemoStore((s) => s.totalCount);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ["things-grouped", moveId],
-    enabled: !!moveId,
+    enabled: !!moveId && !demo,
     queryFn: async () => {
       const [thingsRes, placementsRes] = await Promise.all([
         supabase
@@ -144,6 +148,18 @@ export function useGroupedThings(moveId: string | undefined) {
       return { groups, totalCount: thingsRes.data.length };
     },
   });
+
+  if (demo) {
+    return {
+      ...query,
+      data: { groups: demoGroups, totalCount: demoTotalCount },
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      error: null,
+    } as typeof query;
+  }
+  return query;
 }
 
 interface ThingInput {

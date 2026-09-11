@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { uploadPropertyPhoto } from "@/lib/storage";
+import { useDemoStore } from "@/hooks/use-demo-store";
 import type { PropertyRole } from "@/lib/supabase/types";
 
 export interface MoveProperty {
@@ -23,9 +24,12 @@ export interface CurrentMove {
 
 export function useCurrentMove() {
   const supabase = createClient();
+  const demo = useDemoStore((s) => s.active);
+  const demoMove = useDemoStore((s) => s.move);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ["current-move"],
+    enabled: !demo,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("moves")
@@ -40,14 +44,24 @@ export function useCurrentMove() {
       return data as CurrentMove | null;
     },
   });
+
+  // The Watch-demo sequence (src/lib/demo/demo-script.ts) drives every
+  // world component with scripted data instead of the real move — this is
+  // the seam it patches into. `enabled: !demo` above stops the real query
+  // from ever firing while a demo is running.
+  if (demo) {
+    return { ...query, data: demoMove, isLoading: false, isPending: false, isError: false, error: null } as typeof query;
+  }
+  return query;
 }
 
 export function useOtherMoves(currentMoveId: string | undefined) {
   const supabase = createClient();
+  const demo = useDemoStore((s) => s.active);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ["other-moves", currentMoveId],
-    enabled: !!currentMoveId,
+    enabled: !!currentMoveId && !demo,
     queryFn: async () => {
       const { data: moves, error } = await supabase
         .from("moves")
@@ -90,6 +104,13 @@ export function useOtherMoves(currentMoveId: string | undefined) {
       });
     },
   });
+
+  // The demo never has "other moves" to show — an empty list keeps
+  // MyHizzelOverlay's own "Other moves" section from rendering at all.
+  if (demo) {
+    return { ...query, data: [], isLoading: false, isPending: false, isError: false, error: null } as typeof query;
+  }
+  return query;
 }
 
 interface MoveInput {
