@@ -28,6 +28,8 @@ import { MoveDetailsFormSheet } from "@/components/my-hizzel/move-details-form-s
 import { useBillingStatus } from "@/hooks/use-billing-status";
 import { usePaywallStore } from "@/hooks/use-paywall-store";
 import { useDemoStore } from "@/hooks/use-demo-store";
+import { useFlashStore } from "@/hooks/use-flash-store";
+import { DEMO_SHARE_BUTTON_FLASH_ID } from "@/lib/demo/demo-data";
 
 const ROLE_GRADIENT = {
   current: "linear-gradient(135deg,#C8A882,#B8986F)",
@@ -102,6 +104,7 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   // (used for the Subscription button's own label), so this is named
   // separately rather than shadowing it.
   const canGeneratePdf = hizzelUnlocked || !!move?.is_example;
+  const shareFlashing = useFlashStore((s) => s.flashingIds.has(DEMO_SHARE_BUTTON_FLASH_ID));
 
   // Watch-demo's beat 7: the script sets pdfRequested once it wants "Share"
   // to fire on its own, rather than a real tap — handleShare() below is the
@@ -111,17 +114,7 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   // have and would likely just throw).
   const demoActive = useDemoStore((s) => s.active);
   const demoPdfRequested = useDemoStore((s) => s.pdfRequested);
-  const [demoPdfBlobUrl, setDemoPdfBlobUrl] = useState<string | null>(null);
   const demoPdfFiredRef = useRef(false);
-  // Tracked in state, not a ref (this project's lint config forbids
-  // touching a ref during render) — clears the previous run's PDF the
-  // instant a demo starts or ends, same "adjusting state when a prop
-  // changes" pattern as demo-plan-icon.tsx.
-  const [prevDemoActive, setPrevDemoActive] = useState(false);
-  if (demoActive !== prevDemoActive) {
-    setPrevDemoActive(demoActive);
-    setDemoPdfBlobUrl(null);
-  }
 
   // demoPdfFiredRef only needs resetting between runs, not synchronized
   // with render — an effect is the right place for a plain ref mutation.
@@ -165,10 +158,12 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
 
       if (demoActive) {
         // No navigator.share() here — it needs a direct user gesture,
-        // which this autoplaying script doesn't have (it would just throw).
-        // Displaying it inline is also a truer match for the brief:
-        // "generates and displays the finished document".
-        setDemoPdfBlobUrl(URL.createObjectURL(blob));
+        // which this autoplaying script doesn't have (it would just
+        // throw). Handed off to the store instead of local state —
+        // demo-pdf-reveal.tsx owns the actual "appear large, hold,
+        // shrink into the Share button" display sequence, outside this
+        // overlay's own small scrollable panel so it's readable.
+        useDemoStore.getState().patch({ pdfUrl: URL.createObjectURL(blob) });
         return;
       }
 
@@ -401,19 +396,6 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
                 ))}
               </>
             )}
-
-            {demoActive && demoPdfBlobUrl && (
-              <div className="mt-5">
-                <div className="mb-2.5 text-[10px] font-medium tracking-[0.12em] text-amber-ink/50 uppercase">
-                  Things.pdf
-                </div>
-                <embed
-                  src={demoPdfBlobUrl}
-                  type="application/pdf"
-                  className="h-[240px] w-full rounded-[10px] bg-white"
-                />
-              </div>
-            )}
           </>
         ) : (
           <p className="mt-10 text-center text-sm text-amber-ink/60">Loading…</p>
@@ -440,7 +422,12 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={handleShare}
             disabled={pdfLoading}
-            className="flex flex-1 items-center justify-center gap-1 rounded-full bg-amber-ink/[.18] py-2 text-center text-[11px] font-medium whitespace-nowrap text-amber-ink disabled:opacity-60"
+            // Watch-demo's beat 7 flashes this the instant before "tapping"
+            // it (see demo-script.ts) — same useFlashStore pulse as every
+            // other simulated tap in the sequence.
+            className={`flex flex-1 items-center justify-center gap-1 rounded-full bg-amber-ink/[.18] py-2 text-center text-[11px] font-medium whitespace-nowrap text-amber-ink disabled:opacity-60 ${
+              shareFlashing ? "animate-item-flash" : ""
+            }`}
           >
             <IconShare size={13} />
             {pdfLoading ? "…" : "Share"}

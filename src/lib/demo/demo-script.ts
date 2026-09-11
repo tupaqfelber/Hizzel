@@ -5,12 +5,16 @@
 // a little late).
 import { UNASSIGNED, type ThingGroup } from "@/hooks/use-things";
 import type { MoveItem } from "@/hooks/use-move-items";
+import { useFlashStore } from "@/hooks/use-flash-store";
 import {
   DEMO_AREA,
   DEMO_MOVE_BASE,
+  DEMO_MY_HIZZEL_FLASH_ID,
   DEMO_PLACEMENT_ORDER,
+  DEMO_PLAN_BUTTON_FLASH_ID,
   DEMO_PROPERTIES,
   DEMO_ROOMS,
+  DEMO_SHARE_BUTTON_FLASH_ID,
   DEMO_THINGS,
   type DemoRoomKey,
 } from "@/lib/demo/demo-data";
@@ -109,65 +113,86 @@ export interface DemoPatch {
   overlayOpen?: boolean;
   planIconVisible?: boolean;
   pdfRequested?: boolean;
+  pdfUrl?: string | null;
 }
 
-// Total run time matches the brief's beat durations exactly: 2+3+4+2+3+6+4 = 24s.
 export function runDemoScript(patch: (p: DemoPatch) => void, onFinish: () => void): () => void {
   const revealedIds = new Set<string>();
   const placedIds = new Set<string>();
   const timers: ReturnType<typeof setTimeout>[] = [];
   const at = (ms: number, run: () => void) => timers.push(setTimeout(run, ms));
 
-  // Beat 1 (0-2s): My Hizzel overlay opens, empty — no homes yet.
+  // Beat 0 (0-0.8s): the plain split-screen, empty — nothing overlaid yet.
+  // A beat needs to actually land here before My Hizzel opens, rather than
+  // jump-cutting straight to an already-open overlay. Shorter than the
+  // flash-to-open gap right after it — this one's just "the app, sitting
+  // there" for a moment, not a beat that needs to register on its own.
   patch({
     move: { ...DEMO_MOVE_BASE, properties: [] },
     ...buildThingsSnapshot(revealedIds, placedIds),
     areas: [],
     rooms: [],
-    overlayOpen: true,
+    overlayOpen: false,
     planIconVisible: false,
     pdfRequested: false,
+    pdfUrl: null,
   });
 
-  // Beat 2 (2-5s): the two homes populate in, one at a time.
-  at(2000, () => patch({ move: { ...DEMO_MOVE_BASE, properties: [DEMO_PROPERTIES[0]] } }));
-  at(3500, () => patch({ move: { ...DEMO_MOVE_BASE, properties: DEMO_PROPERTIES } }));
+  // Beat 1 (0.8-1.6s): "My Hizzel" flashes — the same useFlashStore pulse
+  // a real placement gets — as if it's just been tapped. A deliberately
+  // fuller pause after the flash (roughly its own 0.7s duration) before
+  // the overlay actually opens, rather than cutting in mid-flash.
+  at(800, () => useFlashStore.getState().flash(DEMO_MY_HIZZEL_FLASH_ID));
+  at(1600, () => patch({ overlayOpen: true }));
 
-  // Beat 3 (5-9s): overlay closes to reveal Things, which populates one
-  // item at a time across the full 4s.
-  at(5000, () => patch({ overlayOpen: false }));
+  // Beat 2 (2.2-3.1s): the two homes populate in, one at a time.
+  at(2200, () => patch({ move: { ...DEMO_MOVE_BASE, properties: [DEMO_PROPERTIES[0]] } }));
+  at(3100, () => patch({ move: { ...DEMO_MOVE_BASE, properties: DEMO_PROPERTIES } }));
+
+  // Beat 3 (4-8s): overlay closes to reveal Things, which populates
+  // one item at a time across the full 4s.
+  at(4000, () => patch({ overlayOpen: false }));
   DEMO_THINGS.forEach((thing, i) => {
-    at(5100 + i * 380, () => {
+    at(4100 + i * 380, () => {
       revealedIds.add(thing.id);
       patch(buildThingsSnapshot(revealedIds, placedIds));
     });
   });
 
-  // Beat 4 (9-11s): the Houseplan icon flies into the Plan button.
-  at(9000, () => patch({ planIconVisible: true }));
-  at(11000, () => patch({ planIconVisible: false }));
-
-  // Beat 5 (11-14s): rooms materialise, one at a time, as if just
-  // extracted from that plan.
-  DEMO_ROOMS.forEach((_room, i) => {
-    at(11000 + i * 700, () => patch({ areas: [DEMO_AREA], rooms: DEMO_ROOMS.slice(0, i + 1) }));
+  // Beat 4 (8-10s): the Houseplan icon flies into the Plan button, which
+  // flashes the instant it lands.
+  at(8000, () => patch({ planIconVisible: true }));
+  at(10000, () => {
+    patch({ planIconVisible: false });
+    useFlashStore.getState().flash(DEMO_PLAN_BUTTON_FLASH_ID);
   });
 
-  // Beat 6 (14-20s): furniture places itself into its room, staggered
+  // Beat 5 (10-13s): rooms materialise, one at a time, as if just
+  // extracted from that plan.
+  DEMO_ROOMS.forEach((_room, i) => {
+    at(10000 + i * 700, () => patch({ areas: [DEMO_AREA], rooms: DEMO_ROOMS.slice(0, i + 1) }));
+  });
+
+  // Beat 6 (13-19s): furniture places itself into its room, staggered
   // across the full 6s. Moving Box (absent from DEMO_PLACEMENT_ORDER)
   // never places — it stays in Unassigned, deliberately.
   DEMO_PLACEMENT_ORDER.forEach((thingId, i) => {
-    at(14000 + i * 650, () => {
+    at(13000 + i * 650, () => {
       placedIds.add(thingId);
       patch(buildThingsSnapshot(revealedIds, placedIds));
     });
   });
 
-  // Beat 7 (20-24s): My Hizzel reopens, Share "taps" itself shortly after
+  // Beat 7 (19-24s): My Hizzel reopens, Share flashes then "taps" itself
   // (my-hizzel-overlay.tsx's own effect reacts to pdfRequested and calls
-  // its real handleShare()), then the script ends.
-  at(20000, () => patch({ overlayOpen: true }));
-  at(20600, () => patch({ pdfRequested: true }));
+  // its real handleShare()) — demo-pdf-reveal.tsx then owns the
+  // full-screen, page-through-then-hold sequence entirely on its own once
+  // the blob arrives, so finish is timed to sit comfortably after that
+  // plays out (fetch latency + two ~1.4s page holds + a crossfade), not
+  // tied to it directly.
+  at(19000, () => patch({ overlayOpen: true }));
+  at(19600, () => useFlashStore.getState().flash(DEMO_SHARE_BUTTON_FLASH_ID));
+  at(19900, () => patch({ pdfRequested: true }));
   at(24000, onFinish);
 
   return () => timers.forEach(clearTimeout);

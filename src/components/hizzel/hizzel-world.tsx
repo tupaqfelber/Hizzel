@@ -38,6 +38,7 @@ import { EditAreasSheet } from "@/components/hizzel/edit-areas-sheet";
 import { ThingFormSheet } from "@/components/things/thing-form-sheet";
 import { FloorPlanReviewSheet } from "@/components/hizzel/floorplan-review-sheet";
 import { useExtractFloorPlan, type ExtractResponse } from "@/hooks/use-floorplan-import";
+import { DEMO_PLAN_BUTTON_FLASH_ID } from "@/lib/demo/demo-data";
 import type { WorldMode } from "@/components/app-shell";
 
 interface DragState {
@@ -687,9 +688,12 @@ export function HizzelWorld({
           disabled={extracting}
           // The Watch-demo sequence's beat 4 (demo-plan-icon.tsx) animates
           // a Houseplan icon flying into this exact button — a stable
-          // selector for that, nothing else reads it.
+          // selector for that, nothing else reads it. It flashes (same
+          // useFlashStore pulse as My Hizzel) the instant the icon lands.
           data-plan-button
-          className="flex items-center gap-1 rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-3.5 py-[7px] text-[11px] font-medium whitespace-nowrap text-dark-tool-label disabled:opacity-60"
+          className={`flex items-center gap-1 rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-3.5 py-[7px] text-[11px] font-medium whitespace-nowrap text-dark-tool-label disabled:opacity-60 ${
+            flashingIds.has(DEMO_PLAN_BUTTON_FLASH_ID) ? "animate-item-flash" : ""
+          }`}
         >
           <IconUpload size={12} /> {extracting ? "Reading…" : "Plan"}
         </button>

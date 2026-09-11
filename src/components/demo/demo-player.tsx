@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { useDemoStore } from "@/hooks/use-demo-store";
 import { runDemoScript } from "@/lib/demo/demo-script";
 import { DemoPlanIcon } from "@/components/demo/demo-plan-icon";
+import { DemoPdfReveal } from "@/components/demo/demo-pdf-reveal";
 
 // Runs the ~24s scripted "Watch demo" sequence: a real <AppShell>, forced
 // into demo mode (see useDemoStore + the patched data hooks it feeds),
@@ -53,6 +54,7 @@ export function DemoPlayer() {
     <div className="relative h-full w-full">
       <AppShell initialStop="mid" />
       <DemoPlanIcon />
+      <DemoPdfReveal />
       <button
         type="button"
         onClick={handleFinish}

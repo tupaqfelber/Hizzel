@@ -9,6 +9,8 @@ import { useCurrentMove } from "@/hooks/use-current-move";
 import { useIdentifyUser } from "@/hooks/use-identify-user";
 import { useIsomorphicLayoutEffect } from "@/hooks/use-isomorphic-layout-effect";
 import { useDemoStore } from "@/hooks/use-demo-store";
+import { useFlashStore } from "@/hooks/use-flash-store";
+import { DEMO_MY_HIZZEL_FLASH_ID } from "@/lib/demo/demo-data";
 
 const MOVE_THRESHOLD_PX = 5;
 const SNAP_DURATION_MS = 250;
@@ -58,6 +60,11 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
   const { data: move } = useCurrentMove();
   const demoActive = useDemoStore((s) => s.active);
   const demoOverlayOpen = useDemoStore((s) => s.overlayOpen);
+  // Beat 0→1: the demo script flashes this same id (see demo-script.ts)
+  // right before opening the overlay itself — the same useFlashStore every
+  // real item/room placement already uses, so "My Hizzel" reads as tapped,
+  // not jump-cut straight to an already-open overlay.
+  const myHizzelFlashing = useFlashStore((s) => s.flashingIds.has(DEMO_MY_HIZZEL_FLASH_ID));
   const [myHizzelOpen, setMyHizzelOpen] = useState(false);
   // The script (demo-script.ts) opens/closes My Hizzel on its own cues —
   // real taps still work exactly as before once the demo isn't active.
@@ -315,7 +322,9 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
           type="button"
           onClick={() => setMyHizzelOpen(true)}
           aria-label="Open My Hizzel"
-          className="fixed bottom-7 left-1/2 z-30 flex -translate-x-1/2 items-center rounded-full bg-dark-ink px-5 py-2.5 font-serif text-[13px] tracking-[0.02em] whitespace-nowrap text-dark shadow-lg"
+          className={`fixed bottom-7 left-1/2 z-30 flex -translate-x-1/2 items-center rounded-full bg-dark-ink px-5 py-2.5 font-serif text-[13px] tracking-[0.02em] whitespace-nowrap text-dark shadow-lg ${
+            myHizzelFlashing ? "animate-item-flash" : ""
+          }`}
         >
           My Hizzel
         </button>

@@ -31,6 +31,11 @@ interface DemoSnapshot {
   // handleShare() — one code path generates the PDF either way, just
   // triggered by this flag instead of a tap during playback.
   pdfRequested: boolean;
+  // Set by handleShare() once the real PDF blob comes back. Read by
+  // demo-pdf-reveal.tsx, which owns the "appear large, hold, shrink into
+  // the Share button" sequence entirely on its own — kept out of the
+  // overlay's own small scrollable panel so it can actually be read.
+  pdfUrl: string | null;
 }
 
 interface DemoStore extends DemoSnapshot {
@@ -50,6 +55,7 @@ const EMPTY_SNAPSHOT: DemoSnapshot = {
   overlayOpen: false,
   planIconVisible: false,
   pdfRequested: false,
+  pdfUrl: null,
 };
 
 export const useDemoStore = create<DemoStore>((set) => ({

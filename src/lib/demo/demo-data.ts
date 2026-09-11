@@ -11,6 +11,14 @@ import type { ThingCategory } from "@/lib/supabase/types";
 export const DEMO_MOVE_ID = "demo-move";
 export const DEMO_AREA_ID = "demo-area";
 
+// Fed through the app's existing useFlashStore (the same one that flashes
+// an item/room on a real placement) — every simulated "tap" in the demo
+// flashes its real button this same way, rather than the state around it
+// just changing with no visual cue that something was pressed.
+export const DEMO_MY_HIZZEL_FLASH_ID = "demo-my-hizzel-button";
+export const DEMO_PLAN_BUTTON_FLASH_ID = "demo-plan-button";
+export const DEMO_SHARE_BUTTON_FLASH_ID = "demo-share-button";
+
 export const DEMO_PROPERTIES: MoveProperty[] = [
   {
     id: "demo-property-current",
@@ -43,10 +51,15 @@ export const DEMO_MOVE_BASE: Omit<CurrentMove, "properties"> = {
 
 export type DemoRoomKey = "kitchen" | "living" | "bedroom" | "bathroom";
 
+// Flush edge-to-edge (no gap between canvas_x values and the previous
+// room's own width) — a real extracted floor plan reads as one joined
+// building, not separate tiles floating with gaps between them. Same
+// "flush" precedent as the onboarding example move's own seed content
+// (Living Room/Bedroom share a wall there too).
 export const DEMO_ROOMS: (RoomRow & { key: DemoRoomKey })[] = [
   { key: "kitchen", id: "demo-room-kitchen", area_id: DEMO_AREA_ID, name: "Kitchen", width_cm: 300, depth_cm: 260, canvas_x: 0, canvas_y: 0, rotation_deg: 0 },
-  { key: "living", id: "demo-room-living", area_id: DEMO_AREA_ID, name: "Living Room", width_cm: 400, depth_cm: 350, canvas_x: 320, canvas_y: 0, rotation_deg: 0 },
-  { key: "bedroom", id: "demo-room-bedroom", area_id: DEMO_AREA_ID, name: "Bedroom", width_cm: 350, depth_cm: 300, canvas_x: 740, canvas_y: 0, rotation_deg: 0 },
+  { key: "living", id: "demo-room-living", area_id: DEMO_AREA_ID, name: "Living Room", width_cm: 400, depth_cm: 350, canvas_x: 300, canvas_y: 0, rotation_deg: 0 },
+  { key: "bedroom", id: "demo-room-bedroom", area_id: DEMO_AREA_ID, name: "Bedroom", width_cm: 350, depth_cm: 300, canvas_x: 700, canvas_y: 0, rotation_deg: 0 },
   { key: "bathroom", id: "demo-room-bathroom", area_id: DEMO_AREA_ID, name: "Bathroom", width_cm: 200, depth_cm: 180, canvas_x: 1110, canvas_y: 0, rotation_deg: 0 },
 ];
 
