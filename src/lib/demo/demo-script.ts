@@ -10,6 +10,7 @@ import {
   DEMO_AREA,
   DEMO_MOVE_BASE,
   DEMO_MY_HIZZEL_FLASH_ID,
+  DEMO_NEW_MOVE_FLASH_ID,
   DEMO_PLACEMENT_ORDER,
   DEMO_PLAN_BUTTON_FLASH_ID,
   DEMO_PROPERTIES,
@@ -145,55 +146,63 @@ export function runDemoScript(patch: (p: DemoPatch) => void, onFinish: () => voi
   at(800, () => useFlashStore.getState().flash(DEMO_MY_HIZZEL_FLASH_ID));
   at(1600, () => patch({ overlayOpen: true }));
 
-  // Beat 2 (2.2-3.1s): the two homes populate in, one at a time.
-  at(2200, () => patch({ move: { ...DEMO_MOVE_BASE, properties: [DEMO_PROPERTIES[0]] } }));
-  at(3100, () => patch({ move: { ...DEMO_MOVE_BASE, properties: DEMO_PROPERTIES } }));
+  // Beat 2 (1.6-2.4s): the overlay sits empty for a beat (no homes yet),
+  // then "+ New move" flashes — held for exactly as long as beat 0's own
+  // "plain site" hold before My Hizzel flashed (800ms), so the two beats
+  // read as a matched pair. Only once that's fully played out do the
+  // homes start populating — three distinct steps, not a jump straight
+  // from "opened" to "populating".
+  at(1600 + 800, () => useFlashStore.getState().flash(DEMO_NEW_MOVE_FLASH_ID));
 
-  // Beat 3 (4-8s): overlay closes to reveal Things, which populates
+  // Beat 3 (3.1-4s): the two homes populate in, one at a time.
+  at(3100, () => patch({ move: { ...DEMO_MOVE_BASE, properties: [DEMO_PROPERTIES[0]] } }));
+  at(4000, () => patch({ move: { ...DEMO_MOVE_BASE, properties: DEMO_PROPERTIES } }));
+
+  // Beat 4 (4.9-8.9s): overlay closes to reveal Things, which populates
   // one item at a time across the full 4s.
-  at(4000, () => patch({ overlayOpen: false }));
+  at(4900, () => patch({ overlayOpen: false }));
   DEMO_THINGS.forEach((thing, i) => {
-    at(4100 + i * 380, () => {
+    at(5000 + i * 380, () => {
       revealedIds.add(thing.id);
       patch(buildThingsSnapshot(revealedIds, placedIds));
     });
   });
 
-  // Beat 4 (8-10s): the Houseplan icon flies into the Plan button, which
-  // flashes the instant it lands.
-  at(8000, () => patch({ planIconVisible: true }));
-  at(10000, () => {
+  // Beat 5 (8.9-10.9s): the Houseplan icon flies into the Plan button,
+  // which flashes the instant it lands.
+  at(8900, () => patch({ planIconVisible: true }));
+  at(10900, () => {
     patch({ planIconVisible: false });
     useFlashStore.getState().flash(DEMO_PLAN_BUTTON_FLASH_ID);
   });
 
-  // Beat 5 (10-13s): rooms materialise, one at a time, as if just
+  // Beat 6 (10.9-13.9s): rooms materialise, one at a time, as if just
   // extracted from that plan.
   DEMO_ROOMS.forEach((_room, i) => {
-    at(10000 + i * 700, () => patch({ areas: [DEMO_AREA], rooms: DEMO_ROOMS.slice(0, i + 1) }));
+    at(10900 + i * 700, () => patch({ areas: [DEMO_AREA], rooms: DEMO_ROOMS.slice(0, i + 1) }));
   });
 
-  // Beat 6 (13-19s): furniture places itself into its room, staggered
+  // Beat 7 (13.9-19.9s): furniture places itself into its room, staggered
   // across the full 6s. Moving Box (absent from DEMO_PLACEMENT_ORDER)
   // never places — it stays in Unassigned, deliberately.
   DEMO_PLACEMENT_ORDER.forEach((thingId, i) => {
-    at(13000 + i * 650, () => {
+    at(13900 + i * 650, () => {
       placedIds.add(thingId);
       patch(buildThingsSnapshot(revealedIds, placedIds));
     });
   });
 
-  // Beat 7 (19-24s): My Hizzel reopens, Share flashes then "taps" itself
-  // (my-hizzel-overlay.tsx's own effect reacts to pdfRequested and calls
-  // its real handleShare()) — demo-pdf-reveal.tsx then owns the
+  // Beat 8 (19.9-24.9s): My Hizzel reopens, Share flashes then "taps"
+  // itself (my-hizzel-overlay.tsx's own effect reacts to pdfRequested and
+  // calls its real handleShare()) — demo-pdf-reveal.tsx then owns the
   // full-screen, page-through-then-hold sequence entirely on its own once
   // the blob arrives, so finish is timed to sit comfortably after that
   // plays out (fetch latency + two ~1.4s page holds + a crossfade), not
   // tied to it directly.
-  at(19000, () => patch({ overlayOpen: true }));
-  at(19600, () => useFlashStore.getState().flash(DEMO_SHARE_BUTTON_FLASH_ID));
-  at(19900, () => patch({ pdfRequested: true }));
-  at(24000, onFinish);
+  at(19900, () => patch({ overlayOpen: true }));
+  at(20500, () => useFlashStore.getState().flash(DEMO_SHARE_BUTTON_FLASH_ID));
+  at(20800, () => patch({ pdfRequested: true }));
+  at(24900, onFinish);
 
   return () => timers.forEach(clearTimeout);
 }

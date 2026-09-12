@@ -29,7 +29,7 @@ import { useBillingStatus } from "@/hooks/use-billing-status";
 import { usePaywallStore } from "@/hooks/use-paywall-store";
 import { useDemoStore } from "@/hooks/use-demo-store";
 import { useFlashStore } from "@/hooks/use-flash-store";
-import { DEMO_SHARE_BUTTON_FLASH_ID } from "@/lib/demo/demo-data";
+import { DEMO_NEW_MOVE_FLASH_ID, DEMO_SHARE_BUTTON_FLASH_ID } from "@/lib/demo/demo-data";
 
 const ROLE_GRADIENT = {
   current: "linear-gradient(135deg,#C8A882,#B8986F)",
@@ -105,6 +105,7 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   // separately rather than shadowing it.
   const canGeneratePdf = hizzelUnlocked || !!move?.is_example;
   const shareFlashing = useFlashStore((s) => s.flashingIds.has(DEMO_SHARE_BUTTON_FLASH_ID));
+  const newMoveFlashing = useFlashStore((s) => s.flashingIds.has(DEMO_NEW_MOVE_FLASH_ID));
 
   // Watch-demo's beat 7: the script sets pdfRequested once it wants "Share"
   // to fire on its own, rather than a real tap — handleShare() below is the
@@ -300,7 +301,12 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
                 type="button"
                 onClick={handleNewMoveClick}
                 disabled={startNewMove.isPending}
-                className="flex items-center gap-1 rounded-full border border-dashed border-amber-ink/40 px-2.5 py-[5px] text-[10px] font-medium text-amber-ink/85 disabled:opacity-60"
+                // Watch-demo's beat 1: overlay opens empty, holds a beat,
+                // then flashes this exact button (same useFlashStore pulse
+                // as every other simulated tap) before the homes populate.
+                className={`flex items-center gap-1 rounded-full border border-dashed border-amber-ink/40 px-2.5 py-[5px] text-[10px] font-medium text-amber-ink/85 disabled:opacity-60 ${
+                  newMoveFlashing ? "animate-item-flash" : ""
+                }`}
               >
                 <IconPlus size={10} /> {startNewMove.isPending ? "Creating…" : "New move"}
               </button>

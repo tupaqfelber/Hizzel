@@ -16,6 +16,7 @@ export const DEMO_AREA_ID = "demo-area";
 // flashes its real button this same way, rather than the state around it
 // just changing with no visual cue that something was pressed.
 export const DEMO_MY_HIZZEL_FLASH_ID = "demo-my-hizzel-button";
+export const DEMO_NEW_MOVE_FLASH_ID = "demo-new-move-button";
 export const DEMO_PLAN_BUTTON_FLASH_ID = "demo-plan-button";
 export const DEMO_SHARE_BUTTON_FLASH_ID = "demo-share-button";
 
