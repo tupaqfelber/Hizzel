@@ -112,29 +112,27 @@ body {
   animation: demo-flash 1.4s ease-out;
 }
 
-/* Beat 8's final PDF: pops out of the real Share button to fill most of
-   the screen. Deliberately a pure CSS @keyframes animation (runs once,
-   automatically, the instant the element is inserted) rather than a JS
-   state machine driven by requestAnimationFrame — a two-step React-state
-   transition here turned out to be fragile against a dev-mode remount
-   landing mid-transition (confirmed live: the pending rAF got cancelled
-   by an unrelated remount, leaving the reveal stuck at the Share
-   button's own tiny size for the rest of the demo). A CSS animation has
-   no equivalent pending-callback-to-cancel — even a remount just replays
-   the same deterministic animation from its own DOM-order start. The
-   actual start scale/offset (relative to the element's own final,
-   already-correct left/top/width/height) is threaded in via the
-   --pdf-pop-* custom properties, set once inline per element. */
-@keyframes pdf-pop-out {
+/* Beat 8's final PDF: fades/scales up centred on screen — the same
+   "reminiscent of the Houseplan icon" simple centred reveal as
+   demo-plan-icon.tsx's own beat, not travelling from anywhere. A pure
+   CSS @keyframes animation (runs once, automatically, the instant the
+   element is inserted) rather than a JS state machine — an earlier
+   requestAnimationFrame-driven version was confirmed live to be fragile
+   against a dev-mode remount landing mid-transition, permanently
+   cancelling the pending frame. A CSS animation has no equivalent
+   pending callback to lose — even a remount just replays the same
+   deterministic animation. */
+@keyframes pdf-fade-up {
   from {
-    transform: translate(var(--pdf-pop-tx, 0px), var(--pdf-pop-ty, 0px))
-      scale(var(--pdf-pop-sx, 1), var(--pdf-pop-sy, 1));
+    opacity: 0;
+    transform: scale(0.92);
   }
   to {
-    transform: none;
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
-.animate-pdf-pop-out {
-  animation: pdf-pop-out 700ms ease-in-out;
+.animate-pdf-fade-up {
+  animation: pdf-fade-up 500ms ease-out;
 }
