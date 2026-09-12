@@ -121,6 +121,14 @@ export interface ThingsDocumentProps {
   moverPhone: string | null;
   notes: string | null;
   groups: PdfThingGroup[];
+  // Demo-only: forces the whole document onto a single page by wrapping
+  // every group together in one non-breaking view, instead of each
+  // group's own item-count-based wrap threshold. Never set true for a
+  // real user's export — a real move's item count isn't bounded the way
+  // the demo's scripted 10 items are, and wrap={false} on more content
+  // than fits a page silently drops the overflow rather than paginating
+  // it (see MAX_ITEMS_TO_KEEP_TOGETHER above).
+  forceSinglePage?: boolean;
 }
 
 function ItemCardPdf({ item }: { item: PdfThingItem }) {
@@ -181,7 +189,21 @@ export function ThingsDocument({
   moverPhone,
   notes,
   groups,
+  forceSinglePage,
 }: ThingsDocumentProps) {
+  const groupViews = groups.map((group) => (
+    <View key={group.key} wrap={forceSinglePage ? false : group.items.length > MAX_ITEMS_TO_KEEP_TOGETHER}>
+      <Text style={styles.roomHeader}>
+        {group.areaName ? `${group.areaName} · ${group.roomName}` : group.roomName}
+      </Text>
+      <View style={styles.grid}>
+        {group.items.map((item) => (
+          <ItemCardPdf key={item.id} item={item} />
+        ))}
+      </View>
+    </View>
+  ));
+
   return (
     <Document title="My Things">
       <Page size="A4" style={styles.page}>
@@ -224,18 +246,7 @@ export function ThingsDocument({
           </View>
         </View>
 
-        {groups.map((group) => (
-          <View key={group.key} wrap={group.items.length > MAX_ITEMS_TO_KEEP_TOGETHER}>
-            <Text style={styles.roomHeader}>
-              {group.areaName ? `${group.areaName} · ${group.roomName}` : group.roomName}
-            </Text>
-            <View style={styles.grid}>
-              {group.items.map((item) => (
-                <ItemCardPdf key={item.id} item={item} />
-              ))}
-            </View>
-          </View>
-        ))}
+        {forceSinglePage ? <View wrap={false}>{groupViews}</View> : groupViews}
 
         <Text
           style={styles.pageNumber}

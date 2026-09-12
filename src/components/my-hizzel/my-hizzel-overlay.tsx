@@ -323,7 +323,9 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
             )}
 
             <h2 className="font-serif text-[22px] leading-[1.1] text-amber-ink">
-              {current?.nickname ?? "?"} → {next?.nickname ?? "?"}
+              {current?.nickname}
+              {current && next ? " → " : null}
+              {next?.nickname}
             </h2>
             <button
               type="button"
@@ -430,7 +432,10 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
             disabled={pdfLoading}
             // Watch-demo's beat 7 flashes this the instant before "tapping"
             // it (see demo-script.ts) — same useFlashStore pulse as every
-            // other simulated tap in the sequence.
+            // other simulated tap in the sequence. demo-pdf-reveal.tsx also
+            // pops its large PDF preview out from this exact button's
+            // position — a stable selector for that, nothing else reads it.
+            data-share-button
             className={`flex flex-1 items-center justify-center gap-1 rounded-full bg-amber-ink/[.18] py-2 text-center text-[11px] font-medium whitespace-nowrap text-amber-ink disabled:opacity-60 ${
               shareFlashing ? "animate-demo-flash" : ""
             }`}

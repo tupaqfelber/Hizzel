@@ -25,16 +25,39 @@ function roomIdForKey(key: DemoRoomKey | null): string | null {
   return DEMO_ROOMS.find((r) => r.key === key)?.id ?? null;
 }
 
+// A temporary "actually sitting in a different room right now" override —
+// used only by the post-placement shuffle beat, so an item can visibly
+// wander to another room and back without changing its real scripted
+// destination (DemoThingDef.roomKey/placement, which is what the final
+// PDF and the rest of the script's own bookkeeping still key off).
+interface RoomOverride {
+  roomKey: DemoRoomKey;
+  x_cm: number;
+  y_cm: number;
+  rotation_deg: number;
+}
+
 // Rebuilds both the grouped-by-room shape (useGroupedThings) and the flat
 // placement shape (useMoveItems) from the same two sets, so Things and
 // Hizzel's canvas are always looking at one consistent picture of "what's
 // been revealed so far" and "what's been placed so far" — never two
 // snapshots that could disagree.
-function buildThingsSnapshot(revealedIds: Set<string>, placedIds: Set<string>) {
+function buildThingsSnapshot(
+  revealedIds: Set<string>,
+  placedIds: Set<string>,
+  overrides?: Map<string, RoomOverride>,
+) {
   const revealed = DEMO_THINGS.filter((t) => revealedIds.has(t.id));
+
+  function effectivePlacement(t: (typeof DEMO_THINGS)[number]) {
+    const override = overrides?.get(t.id);
+    if (override) return { roomKey: override.roomKey as DemoRoomKey | null, placement: override };
+    return { roomKey: t.roomKey, placement: t.placement };
+  }
 
   const moveItems: MoveItem[] = revealed.map((t) => {
     const isPlaced = placedIds.has(t.id);
+    const { roomKey, placement } = effectivePlacement(t);
     return {
       id: t.id,
       name: t.name,
@@ -44,10 +67,10 @@ function buildThingsSnapshot(revealedIds: Set<string>, placedIds: Set<string>) {
       height_cm: t.height_cm,
       photo_url: t.photo_url,
       notes: null,
-      roomId: isPlaced ? roomIdForKey(t.roomKey) : null,
-      x_cm: isPlaced ? t.placement.x_cm : null,
-      y_cm: isPlaced ? t.placement.y_cm : null,
-      rotation_deg: isPlaced ? t.placement.rotation_deg : 0,
+      roomId: isPlaced ? roomIdForKey(roomKey) : null,
+      x_cm: isPlaced ? placement.x_cm : null,
+      y_cm: isPlaced ? placement.y_cm : null,
+      rotation_deg: isPlaced ? placement.rotation_deg : 0,
       inTray: false,
     };
   });
@@ -66,7 +89,8 @@ function buildThingsSnapshot(revealedIds: Set<string>, placedIds: Set<string>) {
   }
   for (const t of revealed) {
     const isPlaced = placedIds.has(t.id);
-    const room = isPlaced && t.roomKey ? DEMO_ROOMS.find((r) => r.key === t.roomKey) : undefined;
+    const { roomKey } = effectivePlacement(t);
+    const room = isPlaced && roomKey ? DEMO_ROOMS.find((r) => r.key === roomKey) : undefined;
     const key = room?.id ?? UNASSIGNED;
     if (!groupsByKey.has(key)) {
       groupsByKey.set(key, {
@@ -199,18 +223,36 @@ export function runDemoScript(patch: (p: DemoPatch) => void, onFinish: () => voi
     });
   });
 
-  // Beat 8 (20.5-26.6s): My Hizzel reopens, Share flashes then "taps"
+  // Beat 7b (20.4-23.4s): once everything's settled, a couple of items
+  // wander to a different room and back — "as if being arranged", not
+  // just a single static drop. Temporary via the overrides map (see
+  // buildThingsSnapshot) rather than changing their real scripted
+  // destination, so the final PDF/summary still reflects the correct
+  // room assignments regardless of this detour.
+  const shuffleOverrides = new Map<string, RoomOverride>();
+  at(20400, () => {
+    shuffleOverrides.set("demo-bookshelf", { roomKey: "bedroom", x_cm: 20, y_cm: 250, rotation_deg: 0 });
+    shuffleOverrides.set("demo-bedside-table", { roomKey: "bathroom", x_cm: 120, y_cm: 100, rotation_deg: 0 });
+    patch(buildThingsSnapshot(revealedIds, placedIds, shuffleOverrides));
+  });
+  at(21900, () => {
+    shuffleOverrides.clear();
+    patch(buildThingsSnapshot(revealedIds, placedIds, shuffleOverrides));
+  });
+
+  // Beat 8 (23.4-29.5s): My Hizzel reopens, Share flashes then "taps"
   // itself (my-hizzel-overlay.tsx's own effect reacts to pdfRequested and
   // calls its real handleShare()) once the flash has fully played out —
-  // the incoming full-screen PDF reveal would otherwise cover (and cut
-  // off) Share mid-flash, same reasoning as beat 1's My Hizzel/overlay
-  // gap. demo-pdf-reveal.tsx then owns the full-screen, page-through-
-  // then-hold sequence entirely on its own once the blob arrives, so
-  // finish is timed to sit comfortably after that plays out.
-  at(20500, () => patch({ overlayOpen: true }));
-  at(21100, () => useFlashStore.getState().flash(DEMO_SHARE_BUTTON_FLASH_ID, DEMO_FLASH_MS));
-  at(21100 + DEMO_FLASH_MS, () => patch({ pdfRequested: true }));
-  at(26600, onFinish);
+  // the incoming PDF reveal would otherwise cover (and cut off) Share
+  // mid-flash, same reasoning as beat 1's My Hizzel/overlay gap.
+  // demo-pdf-reveal.tsx then owns the pop-out-and-hold sequence entirely
+  // on its own once the blob arrives, so finish is timed to sit
+  // comfortably after that plays out (fetch latency + its own ~700ms
+  // grow + 3s hold).
+  at(23400, () => patch({ overlayOpen: true }));
+  at(24000, () => useFlashStore.getState().flash(DEMO_SHARE_BUTTON_FLASH_ID, DEMO_FLASH_MS));
+  at(24000 + DEMO_FLASH_MS, () => patch({ pdfRequested: true }));
+  at(29500, onFinish);
 
   return () => timers.forEach(clearTimeout);
 }

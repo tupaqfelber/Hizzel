@@ -69,6 +69,7 @@ export async function GET() {
       moverPhone={DEMO_MOVE_BASE.mover_phone}
       notes={DEMO_MOVE_BASE.notes}
       groups={groups}
+      forceSinglePage
     />,
   );
 
