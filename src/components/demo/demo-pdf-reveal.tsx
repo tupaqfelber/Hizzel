@@ -64,7 +64,15 @@ export function DemoPdfReveal() {
       className="animate-pdf-fade-up pointer-events-none fixed z-[300] overflow-hidden rounded-2xl bg-white shadow-[0_40px_120px_rgba(0,0,0,0.5)]"
       style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
     >
-      <embed src={pdfUrl} type="application/pdf" className="h-full w-full" />
+      {/* Chrome's own PDF viewer shows its full toolbar + page-thumbnail
+          sidebar by default (it looks like a print dialog, not a
+          document) — these are Chrome's documented "open parameters"
+          fragment, suppressing all of that down to just the page itself. */}
+      <embed
+        src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+        type="application/pdf"
+        className="h-full w-full"
+      />
     </div>
   );
 }
