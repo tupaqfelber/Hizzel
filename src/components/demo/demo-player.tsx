@@ -82,7 +82,13 @@ export function DemoPlayer() {
             type="button"
             onClick={handleBegin}
             disabled={beginning}
-            className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-amber-ink px-8 py-3 font-serif text-base text-[#5C3A18] shadow-[0_4px_16px_rgba(26,24,20,0.22)] disabled:opacity-60"
+            // The same .animate-demo-flash ring every other simulated-tap
+            // button in the demo gets (My Hizzel, + New move, Plan,
+            // Share) — this is the final, most important call to action,
+            // so it earns the same "tap here" cue as it appears, not just
+            // a plain fade-up. Plays once automatically on mount, right
+            // alongside the fade-up on the wrapping div.
+            className="animate-demo-flash pointer-events-auto inline-flex items-center gap-2 rounded-full bg-amber-ink px-8 py-3 font-serif text-base text-[#5C3A18] shadow-[0_4px_16px_rgba(26,24,20,0.22)] disabled:opacity-60"
           >
             {beginning ? "One moment…" : "Let's begin"}
           </button>
