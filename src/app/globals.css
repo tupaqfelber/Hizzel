@@ -89,3 +89,25 @@ body {
 .animate-item-flash {
   animation: item-flash 0.7s ease-out;
 }
+
+/* Same idea as item-flash above, but for the Watch-demo sequence's own
+   simulated taps (My Hizzel, + New move, Plan, Share) — a passive viewer
+   watching a scripted sequence needs a much more noticeable cue than an
+   active user gets for their own real placement, so this is deliberately
+   bigger (2x ring spread, higher contrast) and held twice as long. Kept
+   separate from .animate-item-flash rather than just tuning that one
+   class, so real in-app placement/selection confirmations elsewhere stay
+   exactly as they were. */
+@keyframes demo-flash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  }
+  35% {
+    box-shadow: 0 0 0 8px var(--flash-color, rgba(168, 114, 56, 0.85));
+  }
+}
+
+.animate-demo-flash {
+  animation: demo-flash 1.4s ease-out;
+}

@@ -692,7 +692,7 @@ export function HizzelWorld({
           // useFlashStore pulse as My Hizzel) the instant the icon lands.
           data-plan-button
           className={`flex items-center gap-1 rounded-[10px] border-[0.5px] border-dark-ink/10 bg-dark-ink/[.07] px-3.5 py-[7px] text-[11px] font-medium whitespace-nowrap text-dark-tool-label disabled:opacity-60 ${
-            flashingIds.has(DEMO_PLAN_BUTTON_FLASH_ID) ? "animate-item-flash" : ""
+            flashingIds.has(DEMO_PLAN_BUTTON_FLASH_ID) ? "animate-demo-flash" : ""
           }`}
         >
           <IconUpload size={12} /> {extracting ? "Reading…" : "Plan"}

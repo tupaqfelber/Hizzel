@@ -139,70 +139,78 @@ export function runDemoScript(patch: (p: DemoPatch) => void, onFinish: () => voi
     pdfUrl: null,
   });
 
-  // Beat 1 (0.8-1.6s): "My Hizzel" flashes — the same useFlashStore pulse
-  // a real placement gets — as if it's just been tapped. A deliberately
-  // fuller pause after the flash (roughly its own 0.7s duration) before
-  // the overlay actually opens, rather than cutting in mid-flash.
-  at(800, () => useFlashStore.getState().flash(DEMO_MY_HIZZEL_FLASH_ID));
-  at(1600, () => patch({ overlayOpen: true }));
+  // Every simulated tap flashes at DEMO_FLASH_MS (double the size + hold
+  // of the real .animate-item-flash a genuine placement gets — see
+  // globals.css's .animate-demo-flash) — a passive viewer needs a much
+  // more noticeable cue than an active user does for their own tap.
+  const DEMO_FLASH_MS = 1400;
 
-  // Beat 2 (1.6-2.4s): the overlay sits empty for a beat (no homes yet),
+  // Beat 1 (0.8-2.2s): "My Hizzel" flashes — as if it's just been tapped.
+  // The overlay only opens once the full flash has played out, not mid-
+  // animation — opening it sooner would cover (and visually cut off) the
+  // button while it's still flashing.
+  at(800, () => useFlashStore.getState().flash(DEMO_MY_HIZZEL_FLASH_ID, DEMO_FLASH_MS));
+  at(800 + DEMO_FLASH_MS, () => patch({ overlayOpen: true }));
+
+  // Beat 2 (2.2-3s): the overlay sits empty for a beat (no homes yet),
   // then "+ New move" flashes — held for exactly as long as beat 0's own
   // "plain site" hold before My Hizzel flashed (800ms), so the two beats
-  // read as a matched pair. Only once that's fully played out do the
-  // homes start populating — three distinct steps, not a jump straight
-  // from "opened" to "populating".
-  at(1600 + 800, () => useFlashStore.getState().flash(DEMO_NEW_MOVE_FLASH_ID));
+  // read as a matched pair. This button isn't covered by anything
+  // afterward, so — unlike My Hizzel above — the next beat doesn't need
+  // to wait out the full flash duration.
+  at(2200 + 800, () => useFlashStore.getState().flash(DEMO_NEW_MOVE_FLASH_ID, DEMO_FLASH_MS));
 
-  // Beat 3 (3.1-4s): the two homes populate in, one at a time.
-  at(3100, () => patch({ move: { ...DEMO_MOVE_BASE, properties: [DEMO_PROPERTIES[0]] } }));
-  at(4000, () => patch({ move: { ...DEMO_MOVE_BASE, properties: DEMO_PROPERTIES } }));
+  // Beat 3 (3.7-4.6s): the two homes populate in, one at a time.
+  at(3700, () => patch({ move: { ...DEMO_MOVE_BASE, properties: [DEMO_PROPERTIES[0]] } }));
+  at(4600, () => patch({ move: { ...DEMO_MOVE_BASE, properties: DEMO_PROPERTIES } }));
 
-  // Beat 4 (4.9-8.9s): overlay closes to reveal Things, which populates
+  // Beat 4 (5.5-9.5s): overlay closes to reveal Things, which populates
   // one item at a time across the full 4s.
-  at(4900, () => patch({ overlayOpen: false }));
+  at(5500, () => patch({ overlayOpen: false }));
   DEMO_THINGS.forEach((thing, i) => {
-    at(5000 + i * 380, () => {
+    at(5600 + i * 380, () => {
       revealedIds.add(thing.id);
       patch(buildThingsSnapshot(revealedIds, placedIds));
     });
   });
 
-  // Beat 5 (8.9-10.9s): the Houseplan icon flies into the Plan button,
-  // which flashes the instant it lands.
-  at(8900, () => patch({ planIconVisible: true }));
-  at(10900, () => {
+  // Beat 5 (9.5-11.5s): the Houseplan icon flies into the Plan button,
+  // which flashes the instant it lands (also not covered by anything
+  // right after, same reasoning as "+ New move" above).
+  at(9500, () => patch({ planIconVisible: true }));
+  at(11500, () => {
     patch({ planIconVisible: false });
-    useFlashStore.getState().flash(DEMO_PLAN_BUTTON_FLASH_ID);
+    useFlashStore.getState().flash(DEMO_PLAN_BUTTON_FLASH_ID, DEMO_FLASH_MS);
   });
 
-  // Beat 6 (10.9-13.9s): rooms materialise, one at a time, as if just
+  // Beat 6 (11.5-14.5s): rooms materialise, one at a time, as if just
   // extracted from that plan.
   DEMO_ROOMS.forEach((_room, i) => {
-    at(10900 + i * 700, () => patch({ areas: [DEMO_AREA], rooms: DEMO_ROOMS.slice(0, i + 1) }));
+    at(11500 + i * 700, () => patch({ areas: [DEMO_AREA], rooms: DEMO_ROOMS.slice(0, i + 1) }));
   });
 
-  // Beat 7 (13.9-19.9s): furniture places itself into its room, staggered
+  // Beat 7 (14.5-20.5s): furniture places itself into its room, staggered
   // across the full 6s. Moving Box (absent from DEMO_PLACEMENT_ORDER)
   // never places — it stays in Unassigned, deliberately.
   DEMO_PLACEMENT_ORDER.forEach((thingId, i) => {
-    at(13900 + i * 650, () => {
+    at(14500 + i * 650, () => {
       placedIds.add(thingId);
       patch(buildThingsSnapshot(revealedIds, placedIds));
     });
   });
 
-  // Beat 8 (19.9-24.9s): My Hizzel reopens, Share flashes then "taps"
+  // Beat 8 (20.5-26.6s): My Hizzel reopens, Share flashes then "taps"
   // itself (my-hizzel-overlay.tsx's own effect reacts to pdfRequested and
-  // calls its real handleShare()) — demo-pdf-reveal.tsx then owns the
-  // full-screen, page-through-then-hold sequence entirely on its own once
-  // the blob arrives, so finish is timed to sit comfortably after that
-  // plays out (fetch latency + two ~1.4s page holds + a crossfade), not
-  // tied to it directly.
-  at(19900, () => patch({ overlayOpen: true }));
-  at(20500, () => useFlashStore.getState().flash(DEMO_SHARE_BUTTON_FLASH_ID));
-  at(20800, () => patch({ pdfRequested: true }));
-  at(24900, onFinish);
+  // calls its real handleShare()) once the flash has fully played out —
+  // the incoming full-screen PDF reveal would otherwise cover (and cut
+  // off) Share mid-flash, same reasoning as beat 1's My Hizzel/overlay
+  // gap. demo-pdf-reveal.tsx then owns the full-screen, page-through-
+  // then-hold sequence entirely on its own once the blob arrives, so
+  // finish is timed to sit comfortably after that plays out.
+  at(20500, () => patch({ overlayOpen: true }));
+  at(21100, () => useFlashStore.getState().flash(DEMO_SHARE_BUTTON_FLASH_ID, DEMO_FLASH_MS));
+  at(21100 + DEMO_FLASH_MS, () => patch({ pdfRequested: true }));
+  at(26600, onFinish);
 
   return () => timers.forEach(clearTimeout);
 }

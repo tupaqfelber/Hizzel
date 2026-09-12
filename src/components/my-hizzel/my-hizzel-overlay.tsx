@@ -305,7 +305,7 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
                 // then flashes this exact button (same useFlashStore pulse
                 // as every other simulated tap) before the homes populate.
                 className={`flex items-center gap-1 rounded-full border border-dashed border-amber-ink/40 px-2.5 py-[5px] text-[10px] font-medium text-amber-ink/85 disabled:opacity-60 ${
-                  newMoveFlashing ? "animate-item-flash" : ""
+                  newMoveFlashing ? "animate-demo-flash" : ""
                 }`}
               >
                 <IconPlus size={10} /> {startNewMove.isPending ? "Creating…" : "New move"}
@@ -432,7 +432,7 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
             // it (see demo-script.ts) — same useFlashStore pulse as every
             // other simulated tap in the sequence.
             className={`flex flex-1 items-center justify-center gap-1 rounded-full bg-amber-ink/[.18] py-2 text-center text-[11px] font-medium whitespace-nowrap text-amber-ink disabled:opacity-60 ${
-              shareFlashing ? "animate-item-flash" : ""
+              shareFlashing ? "animate-demo-flash" : ""
             }`}
           >
             <IconShare size={13} />

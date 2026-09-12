@@ -13,12 +13,16 @@ const FLASH_DURATION_MS = 700;
 
 interface FlashStore {
   flashingIds: Set<string>;
-  flash: (id: string) => void;
+  // durationMs is an override for callers using a different-length CSS
+  // animation than the default (e.g. the Watch-demo sequence's own bigger,
+  // longer "animate-demo-flash" — see globals.css) — defaults to the
+  // standard 700ms real-placement confirmation everywhere else.
+  flash: (id: string, durationMs?: number) => void;
 }
 
 export const useFlashStore = create<FlashStore>((set) => ({
   flashingIds: new Set(),
-  flash: (id) => {
+  flash: (id, durationMs = FLASH_DURATION_MS) => {
     set((state) => ({ flashingIds: new Set(state.flashingIds).add(id) }));
     setTimeout(() => {
       set((state) => {
@@ -26,6 +30,6 @@ export const useFlashStore = create<FlashStore>((set) => ({
         next.delete(id);
         return { flashingIds: next };
       });
-    }, FLASH_DURATION_MS);
+    }, durationMs);
   },
 }));

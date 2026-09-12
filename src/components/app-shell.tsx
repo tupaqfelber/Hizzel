@@ -323,7 +323,7 @@ export function AppShell({ initialStop }: { initialStop: "things" | "hizzel" | "
           onClick={() => setMyHizzelOpen(true)}
           aria-label="Open My Hizzel"
           className={`fixed bottom-7 left-1/2 z-30 flex -translate-x-1/2 items-center rounded-full bg-dark-ink px-5 py-2.5 font-serif text-[13px] tracking-[0.02em] whitespace-nowrap text-dark shadow-lg ${
-            myHizzelFlashing ? "animate-item-flash" : ""
+            myHizzelFlashing ? "animate-demo-flash" : ""
           }`}
         >
           My Hizzel

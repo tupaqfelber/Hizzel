@@ -61,7 +61,12 @@ export const DEMO_ROOMS: (RoomRow & { key: DemoRoomKey })[] = [
   { key: "kitchen", id: "demo-room-kitchen", area_id: DEMO_AREA_ID, name: "Kitchen", width_cm: 300, depth_cm: 260, canvas_x: 0, canvas_y: 0, rotation_deg: 0 },
   { key: "living", id: "demo-room-living", area_id: DEMO_AREA_ID, name: "Living Room", width_cm: 400, depth_cm: 350, canvas_x: 300, canvas_y: 0, rotation_deg: 0 },
   { key: "bedroom", id: "demo-room-bedroom", area_id: DEMO_AREA_ID, name: "Bedroom", width_cm: 350, depth_cm: 300, canvas_x: 700, canvas_y: 0, rotation_deg: 0 },
-  { key: "bathroom", id: "demo-room-bathroom", area_id: DEMO_AREA_ID, name: "Bathroom", width_cm: 200, depth_cm: 180, canvas_x: 1110, canvas_y: 0, rotation_deg: 0 },
+  // North of the Bedroom (negative canvas_y — computeCanvasScale handles
+  // that fine), flush against its top edge, and aligned to its *left*
+  // edge (same canvas_x as the Bedroom, narrower than it) rather than
+  // centred or right-aligned — reads as an en suite carved out of the
+  // bedroom's own footprint, not a fourth room floating in the main row.
+  { key: "bathroom", id: "demo-room-bathroom", area_id: DEMO_AREA_ID, name: "Bathroom", width_cm: 200, depth_cm: 180, canvas_x: 700, canvas_y: -180, rotation_deg: 0 },
 ];
 
 export const DEMO_AREA: Area = {
