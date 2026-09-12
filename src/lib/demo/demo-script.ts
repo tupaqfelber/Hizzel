@@ -117,7 +117,7 @@ export interface DemoPatch {
   pdfUrl?: string | null;
 }
 
-export function runDemoScript(patch: (p: DemoPatch) => void, onFinish: () => void): () => void {
+export function runDemoScript(patch: (p: DemoPatch) => void, onReady: () => void): () => void {
   const revealedIds = new Set<string>();
   const placedIds = new Set<string>();
   const timers: ReturnType<typeof setTimeout>[] = [];
@@ -202,14 +202,15 @@ export function runDemoScript(patch: (p: DemoPatch) => void, onFinish: () => voi
   // calls its real handleShare()) once the flash has fully played out —
   // the incoming PDF reveal would otherwise cover (and cut off) Share
   // mid-flash, same reasoning as beat 1's My Hizzel/overlay gap.
-  // demo-pdf-reveal.tsx then owns the pop-out-and-hold sequence entirely
-  // on its own once the blob arrives, so finish is timed to sit
-  // comfortably after that plays out (fetch latency + its own ~700ms
-  // grow + 3s hold).
+  // demo-pdf-reveal.tsx then owns its own fade-up-and-hold entirely on its
+  // own once the blob arrives, so onReady is timed to sit comfortably
+  // after that plays out (fetch latency + its own ~500ms fade + a hold)
+  // — the demo doesn't auto-finish from here; onReady just tells the
+  // player it's time to show the "Let's begin" button and wait.
   at(20100, () => patch({ overlayOpen: true }));
   at(20700, () => useFlashStore.getState().flash(DEMO_SHARE_BUTTON_FLASH_ID, DEMO_FLASH_MS));
   at(20700 + DEMO_FLASH_MS, () => patch({ pdfRequested: true }));
-  at(26200, onFinish);
+  at(26200, onReady);
 
   return () => timers.forEach(clearTimeout);
 }

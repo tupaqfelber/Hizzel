@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDemoStore } from "@/hooks/use-demo-store";
 
 // A4 at 72pt/inch (595.28 x 841.89pt) — the demo's PDF is forced to a
@@ -40,12 +40,24 @@ function targetRect(): Rect {
 // Beat 8's finale: once my-hizzel-overlay.tsx's handleShare() sets pdfUrl,
 // the real (single-page) PDF fades/scales up centred on screen — the same
 // simple, centred treatment as demo-plan-icon.tsx's own reveal — and just
-// holds there. demo-script.ts's own timeline decides when the whole
-// sequence (and the demo) ends, not this component.
+// holds there. demo-script.ts's own timeline decides when to reveal the
+// "Let's begin" button, not this component.
+//
+// This renders the page onto a plain <canvas> via pdfjs-dist rather than
+// handing the blob to an <embed>/<iframe> — Chrome's own built-in PDF
+// viewer can't be fully tamed: even with its toolbar/sidebar suppressed
+// via URL fragment, it still draws the page onto its own dark "desk"
+// backdrop, which shows through as an inconsistent black band or shadow
+// whenever the fitted page doesn't exactly fill the element (and that fit
+// is a black box we don't control). Rasterising the page ourselves means
+// there's no other renderer's chrome or backdrop left to fight — just our
+// own white card and single shadow, the same clean look as the Houseplan
+// card (demo-plan-icon.tsx) right before it.
 export function DemoPdfReveal() {
   const pdfUrl = useDemoStore((s) => s.pdfUrl);
   const [prevPdfUrl, setPrevPdfUrl] = useState<string | null>(null);
   const [rect, setRect] = useState<Rect | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Adjusted during render, not an effect — same "adjusting state when a
   // prop changes" pattern used throughout the demo components. The CSS
@@ -56,6 +68,39 @@ export function DemoPdfReveal() {
     setRect(pdfUrl ? targetRect() : null);
   }
 
+  // Renders page 1 onto the canvas at devicePixelRatio resolution
+  // whenever the URL or the target size changes, so it stays crisp
+  // rather than upscaling a lower-res raster.
+  useEffect(() => {
+    if (!pdfUrl || !rect) return;
+    let cancelled = false;
+    (async () => {
+      const pdfjsLib = await import("pdfjs-dist");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+        "pdfjs-dist/build/pdf.worker.min.mjs",
+        import.meta.url,
+      ).toString();
+      const doc = await pdfjsLib.getDocument({ url: pdfUrl }).promise;
+      if (cancelled) return;
+      const page = await doc.getPage(1);
+      if (cancelled) return;
+      const dpr = window.devicePixelRatio || 1;
+      const unscaled = page.getViewport({ scale: 1 });
+      const scale = (rect.width * dpr) / unscaled.width;
+      const viewport = page.getViewport({ scale });
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pdfUrl, rect]);
+
   if (!pdfUrl || !rect) return null;
 
   return (
@@ -64,15 +109,7 @@ export function DemoPdfReveal() {
       className="animate-pdf-fade-up pointer-events-none fixed z-[300] overflow-hidden rounded-2xl bg-white shadow-[0_40px_120px_rgba(0,0,0,0.5)]"
       style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
     >
-      {/* Chrome's own PDF viewer shows its full toolbar + page-thumbnail
-          sidebar by default (it looks like a print dialog, not a
-          document) — these are Chrome's documented "open parameters"
-          fragment, suppressing all of that down to just the page itself. */}
-      <embed
-        src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-        type="application/pdf"
-        className="h-full w-full"
-      />
+      <canvas ref={canvasRef} className="h-full w-full" />
     </div>
   );
 }

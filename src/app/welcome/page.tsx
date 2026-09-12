@@ -98,7 +98,7 @@ export default function WelcomePage() {
   if (isDesktopWidth) {
     return (
       <div className="flex h-dvh w-dvw items-center justify-center bg-[#7A4E20] p-8">
-        <div className="flex h-[720px] w-[1200px] max-w-full flex-col items-center bg-[linear-gradient(160deg,#A87238_0%,#9A6630_30%,#8A5A28_70%,#7A4E20_100%)] px-12 py-8 text-center shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+        <div className="flex h-[720px] w-[1200px] max-w-full flex-col items-center overflow-hidden rounded-[28px] border-2 border-[#6A4218] bg-[linear-gradient(160deg,#A87238_0%,#9A6630_30%,#8A5A28_70%,#7A4E20_100%)] px-12 py-8 text-center shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
           <div className="mb-2.5 flex h-[70px] w-[70px] shrink-0 items-center justify-center rounded-[17px] bg-amber-ink shadow-[0_4px_18px_rgba(26,24,20,0.2)]">
             <Image src="/logo.png" alt="" width={45} height={45} className="rounded-lg" />
           </div>
