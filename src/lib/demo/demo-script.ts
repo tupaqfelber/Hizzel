@@ -162,42 +162,45 @@ export function runDemoScript(patch: (p: DemoPatch) => void, onReady: () => void
   at(3400, () => patch({ move: { ...DEMO_MOVE_BASE, properties: [DEMO_PROPERTIES[0]] } }));
   at(4300, () => patch({ move: { ...DEMO_MOVE_BASE, properties: DEMO_PROPERTIES } }));
 
-  // Beat 4 (5.2-9.2s): overlay closes to reveal Things, which populates
-  // one item at a time across the full 4s.
-  at(5200, () => patch({ overlayOpen: false }));
+  // Beat 4 (5.5-9.5s): overlay closes to reveal Things, which populates
+  // one item at a time across the full 4s. The hold on both houses fully
+  // populated (since beat 3's 4300 to this 5500) was bumped from 900ms to
+  // 1200ms on request — everything from here on shifts by that same
+  // +300ms so every later gap keeps its own original width.
+  at(5500, () => patch({ overlayOpen: false }));
   DEMO_THINGS.forEach((thing, i) => {
-    at(5300 + i * 380, () => {
+    at(5600 + i * 380, () => {
       revealedIds.add(thing.id);
       patch(buildThingsSnapshot(revealedIds, placedIds));
     });
   });
 
-  // Beat 5 (9.2-11.2s): the Houseplan icon flies into the Plan button,
+  // Beat 5 (9.5-11.5s): the Houseplan icon flies into the Plan button,
   // which flashes the instant it lands (also not covered by anything
   // right after, same reasoning as "+ New move" above).
-  at(9200, () => patch({ planIconVisible: true }));
-  at(11200, () => {
+  at(9500, () => patch({ planIconVisible: true }));
+  at(11500, () => {
     patch({ planIconVisible: false });
     useFlashStore.getState().flash(DEMO_PLAN_BUTTON_FLASH_ID, DEMO_FLASH_MS);
   });
 
-  // Beat 6 (11.2-14.2s): rooms materialise, one at a time, as if just
+  // Beat 6 (11.5-14.5s): rooms materialise, one at a time, as if just
   // extracted from that plan.
   DEMO_ROOMS.forEach((_room, i) => {
-    at(11200 + i * 700, () => patch({ areas: [DEMO_AREA], rooms: DEMO_ROOMS.slice(0, i + 1) }));
+    at(11500 + i * 700, () => patch({ areas: [DEMO_AREA], rooms: DEMO_ROOMS.slice(0, i + 1) }));
   });
 
-  // Beat 7 (14.2-20.2s): furniture places itself into its room, staggered
+  // Beat 7 (14.5-20.5s): furniture places itself into its room, staggered
   // across the full 6s. Moving Box (absent from DEMO_PLACEMENT_ORDER)
   // never places — it stays in Unassigned, deliberately.
   DEMO_PLACEMENT_ORDER.forEach((thingId, i) => {
-    at(14200 + i * 650, () => {
+    at(14500 + i * 650, () => {
       placedIds.add(thingId);
       patch(buildThingsSnapshot(revealedIds, placedIds));
     });
   });
 
-  // Beat 8 (20.1-26.2s): My Hizzel reopens, Share flashes then "taps"
+  // Beat 8 (20.4-26.5s): My Hizzel reopens, Share flashes then "taps"
   // itself (my-hizzel-overlay.tsx's own effect reacts to pdfRequested and
   // calls its real handleShare()) once the flash has fully played out —
   // the incoming PDF reveal would otherwise cover (and cut off) Share
@@ -207,10 +210,10 @@ export function runDemoScript(patch: (p: DemoPatch) => void, onReady: () => void
   // after that plays out (fetch latency + its own ~500ms fade + a hold)
   // — the demo doesn't auto-finish from here; onReady just tells the
   // player it's time to show the "Let's begin" button and wait.
-  at(20100, () => patch({ overlayOpen: true }));
-  at(20700, () => useFlashStore.getState().flash(DEMO_SHARE_BUTTON_FLASH_ID, DEMO_FLASH_MS));
-  at(20700 + DEMO_FLASH_MS, () => patch({ pdfRequested: true }));
-  at(26200, onReady);
+  at(20400, () => patch({ overlayOpen: true }));
+  at(21000, () => useFlashStore.getState().flash(DEMO_SHARE_BUTTON_FLASH_ID, DEMO_FLASH_MS));
+  at(21000 + DEMO_FLASH_MS, () => patch({ pdfRequested: true }));
+  at(26500, onReady);
 
   return () => timers.forEach(clearTimeout);
 }
