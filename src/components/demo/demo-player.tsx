@@ -21,7 +21,14 @@ export function DemoPlayer() {
 
   useEffect(() => {
     function update() {
-      setIsPhysicallyPortrait(window.innerWidth <= window.innerHeight);
+      const portrait = window.innerWidth <= window.innerHeight;
+      setIsPhysicallyPortrait(portrait);
+      // See use-demo-store.ts's own comment on rotatedMaxHeightPx — only
+      // meaningful (non-null) while the rotation wrapper below is
+      // actually applied, so any vh-sized modal (my-hizzel-overlay.tsx)
+      // rendered inside it has the real pixel budget to size against
+      // instead of a `vh` unit that ignores the rotation entirely.
+      useDemoStore.getState().patch({ rotatedMaxHeightPx: portrait ? window.innerWidth : null });
     }
     update();
     window.addEventListener("resize", update);
@@ -41,11 +48,36 @@ export function DemoPlayer() {
     window.location.href = "/welcome";
   }, []);
 
-  // The script's own natural end no longer auto-finishes — it holds on
-  // the finished PDF and calls this to reveal a real "Let's begin" button
-  // instead, same as welcome/page.tsx's own CTA, so watching the demo
-  // through leads straight into the real app rather than bouncing back
-  // through the Welcome screen a second time.
+  // Reveals "Let's begin" a fixed hold after the real PDF actually
+  // arrives — not at a fixed point on the script's own clock. The PDF is
+  // a real fetch (my-hizzel-overlay.tsx's handleShare() hitting
+  // /api/things/pdf/demo), and how long that takes varies with the
+  // server (a cold serverless instance is slower than a warm local dev
+  // server) — a fixed timer that assumed a fast fetch could let this
+  // button appear before the PDF itself ever showed up, which is exactly
+  // what happened on a real deploy. Triggering off pdfUrl arriving
+  // instead guarantees the PDF is always shown first, however long the
+  // fetch actually took.
+  const pdfUrl = useDemoStore((s) => s.pdfUrl);
+  const PDF_HOLD_BEFORE_BEGIN_MS = 3000;
+
+  useEffect(() => {
+    if (!pdfUrl) return;
+    const timer = setTimeout(() => setShowLetsBegin(true), PDF_HOLD_BEFORE_BEGIN_MS);
+    return () => clearTimeout(timer);
+  }, [pdfUrl]);
+
+  // Safety net: if the PDF fetch ever fails outright (handleShare's own
+  // catch just logs and swallows the error, so pdfUrl above would never
+  // arrive), this generous absolute ceiling still reveals "Let's begin"
+  // so a real failure can't strand a viewer with no way to continue.
+  useEffect(() => {
+    const timer = setTimeout(() => setShowLetsBegin(true), 35_000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Leads straight into the real app rather than bouncing back through
+  // the Welcome screen a second time, same as welcome/page.tsx's own CTA.
   const handleBegin = useCallback(async () => {
     if (finishedRef.current || beginning) return;
     setBeginning(true);
@@ -64,7 +96,12 @@ export function DemoPlayer() {
   useEffect(() => {
     finishedRef.current = false;
     useDemoStore.getState().start();
-    const stop = runDemoScript(useDemoStore.getState().patch, () => setShowLetsBegin(true));
+    // start() resets the whole snapshot (rotatedMaxHeightPx included) —
+    // re-assert it fresh right after, rather than relying on effect
+    // declaration order against the orientation-tracking effect above.
+    const portrait = window.innerWidth <= window.innerHeight;
+    useDemoStore.getState().patch({ rotatedMaxHeightPx: portrait ? window.innerWidth : null });
+    const stop = runDemoScript(useDemoStore.getState().patch);
     return () => {
       stop();
       useDemoStore.getState().finish();

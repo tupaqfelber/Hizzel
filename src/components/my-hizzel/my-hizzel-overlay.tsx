@@ -106,6 +106,14 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   const canGeneratePdf = hizzelUnlocked || !!move?.is_example;
   const shareFlashing = useFlashStore((s) => s.flashingIds.has(DEMO_SHARE_BUTTON_FLASH_ID));
   const newMoveFlashing = useFlashStore((s) => s.flashingIds.has(DEMO_NEW_MOVE_FLASH_ID));
+  // See use-demo-store.ts's own comment: non-null only while the demo's
+  // forced-landscape rotation wrapper is actually active, in which case
+  // it's the real available pixel budget on this panel's cross axis —
+  // `vh` (the max-h-[85vh] class below) measures the real, un-rotated
+  // device viewport and has no idea it's nested inside a `transform`
+  // ancestor with a much smaller actual containing block, so it badly
+  // overflows there unless overridden with this instead.
+  const rotatedMaxHeightPx = useDemoStore((s) => s.rotatedMaxHeightPx);
 
   // Watch-demo's beat 7: the script sets pdfRequested once it wants "Share"
   // to fire on its own, rather than a real tap — handleShare() below is the
@@ -277,7 +285,10 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/45" onClick={onClose} aria-hidden />
-      <div className="animate-panel-rise-always relative flex max-h-[85vh] w-full max-w-[440px] flex-col overflow-hidden rounded-[26px] bg-[linear-gradient(160deg,#A87238_0%,#9A6630_30%,#8A5A28_70%,#7A4E20_100%)] shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+      <div
+        className="animate-panel-rise-always relative flex max-h-[85vh] w-full max-w-[440px] flex-col overflow-hidden rounded-[26px] bg-[linear-gradient(160deg,#A87238_0%,#9A6630_30%,#8A5A28_70%,#7A4E20_100%)] shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
+        style={rotatedMaxHeightPx ? { maxHeight: rotatedMaxHeightPx * 0.85 } : undefined}
+      >
       <div className="flex shrink-0 items-center justify-between px-6 pt-4 pb-1">
         <h1 className="font-serif text-2xl tracking-[-0.3px] text-amber-ink">My Hizzel</h1>
         <button

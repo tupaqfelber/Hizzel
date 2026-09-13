@@ -117,7 +117,7 @@ export interface DemoPatch {
   pdfUrl?: string | null;
 }
 
-export function runDemoScript(patch: (p: DemoPatch) => void, onReady: () => void): () => void {
+export function runDemoScript(patch: (p: DemoPatch) => void): () => void {
   const revealedIds = new Set<string>();
   const placedIds = new Set<string>();
   const timers: ReturnType<typeof setTimeout>[] = [];
@@ -200,20 +200,17 @@ export function runDemoScript(patch: (p: DemoPatch) => void, onReady: () => void
     });
   });
 
-  // Beat 8 (20.4-26.5s): My Hizzel reopens, Share flashes then "taps"
-  // itself (my-hizzel-overlay.tsx's own effect reacts to pdfRequested and
-  // calls its real handleShare()) once the flash has fully played out —
-  // the incoming PDF reveal would otherwise cover (and cut off) Share
-  // mid-flash, same reasoning as beat 1's My Hizzel/overlay gap.
-  // demo-pdf-reveal.tsx then owns its own fade-up-and-hold entirely on its
-  // own once the blob arrives, so onReady is timed to sit comfortably
-  // after that plays out (fetch latency + its own ~500ms fade + a hold)
-  // — the demo doesn't auto-finish from here; onReady just tells the
-  // player it's time to show the "Let's begin" button and wait.
+  // Beat 8 (20.4s on): My Hizzel reopens, Share flashes then "taps" itself
+  // (my-hizzel-overlay.tsx's own effect reacts to pdfRequested and calls
+  // its real handleShare()) once the flash has fully played out — the
+  // incoming PDF reveal would otherwise cover (and cut off) Share mid-
+  // flash, same reasoning as beat 1's My Hizzel/overlay gap. The script's
+  // own timeline ends here — demo-player.tsx owns everything from the
+  // real PDF actually arriving onward (it can't be scripted on a fixed
+  // clock, since the fetch's own latency varies with the server).
   at(20400, () => patch({ overlayOpen: true }));
   at(21000, () => useFlashStore.getState().flash(DEMO_SHARE_BUTTON_FLASH_ID, DEMO_FLASH_MS));
   at(21000 + DEMO_FLASH_MS, () => patch({ pdfRequested: true }));
-  at(26500, onReady);
 
   return () => timers.forEach(clearTimeout);
 }

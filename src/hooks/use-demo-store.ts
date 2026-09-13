@@ -36,6 +36,17 @@ interface DemoSnapshot {
   // the Share button" sequence entirely on its own — kept out of the
   // overlay's own small scrollable panel so it can actually be read.
   pdfUrl: string | null;
+  // Set by demo-player.tsx whenever its own forced-landscape rotation
+  // wrapper is actually active (device physically portrait) — null
+  // otherwise. `vh` CSS units always measure the real, un-rotated device
+  // viewport, completely ignoring that a `transform` ancestor gives its
+  // descendants a different, smaller containing block — so a `vh`-based
+  // max-height (my-hizzel-overlay.tsx's `max-h-[85vh]`) badly overflows
+  // its own actual (cross-axis, pixel) budget once nested inside that
+  // rotated frame. This is that real pixel budget (window.innerWidth,
+  // the wrapper's own pre-rotation height) for the overlay to size
+  // against instead, precisely when — and only when — it's needed.
+  rotatedMaxHeightPx: number | null;
 }
 
 interface DemoStore extends DemoSnapshot {
@@ -56,6 +67,7 @@ const EMPTY_SNAPSHOT: DemoSnapshot = {
   planIconVisible: false,
   pdfRequested: false,
   pdfUrl: null,
+  rotatedMaxHeightPx: null,
 };
 
 export const useDemoStore = create<DemoStore>((set) => ({
