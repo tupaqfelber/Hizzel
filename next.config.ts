@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   // makes the dev client repeatedly retry/reload the page — breaking any
   // in-progress interaction (a typed email getting wiped mid-submit, etc.)
   // even though the app itself is otherwise working fine.
-  allowedDevOrigins: ["172.20.13.69", "*.ngrok-free.dev", "*.ngrok-free.app"],
+  allowedDevOrigins: ["172.20.13.69", "192.168.1.226", "*.ngrok-free.dev", "*.ngrok-free.app"],
 };
 
 export default nextConfig;
