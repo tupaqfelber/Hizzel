@@ -152,10 +152,14 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   // active Annual subscription gets the single "Unsubscribe" action,
   // since that's the one case with something to actually cancel.
   const showsPlanOptions = !hizzelUnlocked || cancelAtPeriodEnd || product !== "annual";
+  // Labelled "Billing", not "Subscription" — real user feedback: someone
+  // who only wanted the one-time Pass assumed this button meant signing
+  // up for recurring billing and didn't click it. "Billing" stays neutral
+  // between the Pass (one-time) and Annual (recurring) it actually opens.
   const subscriptionButtonLabel = subscriptionActionLoading
     ? "Please wait…"
     : showsPlanOptions
-      ? "Subscription"
+      ? "Billing"
       : "Unsubscribe";
 
   async function handleSignOut() {
