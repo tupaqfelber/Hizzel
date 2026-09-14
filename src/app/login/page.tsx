@@ -10,6 +10,11 @@ import { useAutoFocus } from "@/hooks/use-auto-focus";
 
 type Step = "email" | "code";
 
+// Promotional "7-Day Free Trial" banner (see paywall-sheet.tsx's own
+// TRIAL_OFFER_ENABLED for the matching paywall card) — one flag, flipped
+// off once the promotion's done its job.
+const TRIAL_BANNER_ENABLED = true;
+
 // For any 5xx-class response, the Supabase JS SDK treats it as a
 // retryable infrastructure error rather than an application error with a
 // real message — its own error-message fallback then does
@@ -77,8 +82,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col overflow-y-auto bg-linen px-10">
-      <div className="flex w-full max-w-xs flex-1 shrink-0 flex-col items-center justify-center self-center py-8">
+    <div className="flex min-h-dvh flex-col overflow-y-auto bg-linen">
+      {TRIAL_BANNER_ENABLED && (
+        <div className="shrink-0 bg-linen-ink px-4 py-2.5 text-center text-[11px] font-medium tracking-[0.01em] text-linen">
+          Try Hizzel free for 7 days — limited time only.
+        </div>
+      )}
+      <div className="flex w-full max-w-xs flex-1 shrink-0 flex-col items-center justify-center self-center px-10 py-8">
         <Image
           src="/logo.png"
           alt=""
