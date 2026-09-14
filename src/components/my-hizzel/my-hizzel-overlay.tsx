@@ -135,19 +135,28 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   const next = move?.properties.find((p) => p.role === "new");
   const days = move?.move_date ? daysToGo(move.move_date) : null;
 
-  // Stripe's Customer Portal can't bridge these two products directly — its
+  // Stripe's Customer Portal can't bridge these products directly — its
   // "switch plan" feature only swaps between recurring prices on an
-  // existing Subscription, and the Pass has no Subscription object at all
-  // (a one-time payment). So this is bespoke, reusing the same endpoints
-  // the paywall already calls rather than routing through the portal.
-  const showsPlanOptions = !hizzelUnlocked || cancelAtPeriodEnd;
+  // existing Subscription, and neither the Pass nor the Trial has a
+  // Subscription object at all (both one-time payments). So this is
+  // bespoke, reusing the same endpoints the paywall already calls rather
+  // than routing through the portal.
+  //
+  // Anything that ISN'T an active Annual subscription reopens the full
+  // paywall rather than jumping straight to one fixed action — someone on
+  // a Pass or a Trial might want a fresh 90-day Pass just as easily as an
+  // Annual upgrade (previously this only offered the Annual upgrade,
+  // with no way to buy a real Pass while already unlocked at all — found
+  // live while testing the Trial: without this, converting off a trial
+  // mid-week onto a real Pass had no path in the UI). Only a genuinely
+  // active Annual subscription gets the single "Unsubscribe" action,
+  // since that's the one case with something to actually cancel.
+  const showsPlanOptions = !hizzelUnlocked || cancelAtPeriodEnd || product !== "annual";
   const subscriptionButtonLabel = subscriptionActionLoading
     ? "Please wait…"
     : showsPlanOptions
       ? "Subscription"
-      : product === "pass"
-        ? "Subscribe"
-        : "Unsubscribe";
+      : "Unsubscribe";
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -214,35 +223,18 @@ export function MyHizzelOverlay({ onClose }: { onClose: () => void }) {
   }, [demoActive, demoPdfRequested]);
 
   async function handleSubscriptionClick() {
-    // Already cancelled-but-still-unlocked reads the same as no plan at
-    // all — they might change their mind and buy again before it lapses.
+    // Covers "not unlocked at all", "cancelled but still unlocked" (they
+    // might change their mind and buy again before it lapses), and "on a
+    // Pass or Trial" (nothing to cancel, might want a fresh Pass or to go
+    // Annual) — see showsPlanOptions' own comment above.
     if (showsPlanOptions) {
       usePaywallStore.getState().open();
       return;
     }
 
-    if (product === "pass") {
-      // Upgrade straight to Annual — the same call the paywall's own
-      // Annual card makes, just triggered from here instead.
-      setSubscriptionActionLoading(true);
-      try {
-        const res = await fetch("/api/stripe/checkout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ product: "annual" }),
-        });
-        const body = await res.json();
-        if (!res.ok || !body.url) throw new Error(body.error ?? "Couldn't start checkout");
-        window.location.href = body.url;
-      } catch (err) {
-        setSubscriptionActionLoading(false);
-        window.alert(err instanceof Error ? err.message : "Something went wrong");
-      }
-      return;
-    }
-
-    // product === "annual": schedule cancellation, not an immediate cutoff
-    // — they've already paid for the current period.
+    // Only reachable when product === "annual" and not already scheduled
+    // to cancel — schedule cancellation, not an immediate cutoff, since
+    // they've already paid for the current period.
     const endDate = unlockedUntil
       ? new Date(unlockedUntil).toLocaleDateString("en-GB", {
           day: "numeric",

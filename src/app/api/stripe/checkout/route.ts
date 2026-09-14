@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getStripeClient } from "@/lib/stripe";
 
-const PRICE_IDS: Record<"pass" | "annual", string | undefined> = {
+const PRICE_IDS: Record<"trial" | "pass" | "annual", string | undefined> = {
+  trial: process.env.STRIPE_PRICE_TRIAL_ID,
   pass: process.env.STRIPE_PRICE_PASS_ID,
   annual: process.env.STRIPE_PRICE_ANNUAL_ID,
 };
@@ -15,13 +16,13 @@ const PRICE_IDS: Record<"pass" | "annual", string | undefined> = {
 // types are regenerated.
 interface ProfilesStripeIdTable {
   from(table: "profiles"): {
-    select(cols: "stripe_customer_id"): {
+    select(cols: "stripe_customer_id, trial_used"): {
       eq(
         col: "id",
         val: string,
       ): {
         maybeSingle(): Promise<
-          | { data: { stripe_customer_id: string | null }; error: null }
+          | { data: { stripe_customer_id: string | null; trial_used: boolean }; error: null }
           | { data: null; error: { message: string } }
         >;
       };
@@ -40,10 +41,10 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const requestedProduct: unknown = body?.product;
-  if (requestedProduct !== "pass" && requestedProduct !== "annual") {
+  if (requestedProduct !== "trial" && requestedProduct !== "pass" && requestedProduct !== "annual") {
     return NextResponse.json({ error: "Invalid product" }, { status: 400 });
   }
-  const product: "pass" | "annual" = requestedProduct;
+  const product: "trial" | "pass" | "annual" = requestedProduct;
 
   const priceId = PRICE_IDS[product];
   if (!priceId) {
@@ -55,10 +56,18 @@ export async function POST(request: Request) {
   // accumulate duplicate Customers.
   const { data: profile } = await (supabase as unknown as ProfilesStripeIdTable)
     .from("profiles")
-    .select("stripe_customer_id")
+    .select("stripe_customer_id, trial_used")
     .eq("id", user.id)
     .maybeSingle();
   const existingCustomerId = profile?.stripe_customer_id ?? undefined;
+
+  // One trial per account, ever — trial_used is never reset by a later
+  // real purchase (unlike hizzel_product, which gets overwritten), so
+  // this stays a reliable "have they ever had one" check even after they
+  // convert to a paid Pass/Annual.
+  if (product === "trial" && profile?.trial_used) {
+    return NextResponse.json({ error: "You've already used your free trial" }, { status: 400 });
+  }
 
   const origin = request.headers.get("origin") ?? new URL(request.url).origin;
   const stripe = getStripeClient();
@@ -66,7 +75,7 @@ export async function POST(request: Request) {
   let session;
   try {
     session = await stripe.checkout.sessions.create({
-      mode: product === "pass" ? "payment" : "subscription",
+      mode: product === "annual" ? "subscription" : "payment",
       line_items: [{ price: priceId, quantity: 1 }],
       client_reference_id: user.id,
       metadata: { product },
@@ -82,10 +91,10 @@ export async function POST(request: Request) {
         : {
             customer_email: user.email ?? undefined,
             // Checkout only auto-creates a Customer for subscription mode
-            // by default — without this, a one-time Pass purchase would
-            // never get a stripe_customer_id, breaking the portal button
-            // and future repurchase reuse above.
-            ...(product === "pass" ? { customer_creation: "always" as const } : {}),
+            // by default — without this, a one-time Pass/Trial purchase
+            // would never get a stripe_customer_id, breaking the portal
+            // button and future repurchase reuse above.
+            ...(product !== "annual" ? { customer_creation: "always" as const } : {}),
           }),
       success_url: `${origin}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: origin,

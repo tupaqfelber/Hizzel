@@ -12,7 +12,7 @@ import type { PlanTier } from "@/lib/supabase/types";
 interface ProfileRow {
   plan_tier: PlanTier;
   hizzel_unlocked_until: string | null;
-  hizzel_product: "pass" | "annual" | null;
+  hizzel_product: "trial" | "pass" | "annual" | null;
   hizzel_cancel_at_period_end: boolean;
 }
 

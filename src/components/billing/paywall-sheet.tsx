@@ -9,24 +9,31 @@ import { CATEGORY_COLORS } from "@/lib/category-colors";
 
 // Each plan borrows a category's existing pastel tone rather than inventing
 // new colours — Boxes (packing, a short one-off) for the one-time Pass,
-// Storage (long-term) for the recurring Annual — so the cards read as part
+// Storage (long-term) for the recurring Annual, Seating (warm, stands
+// apart from both) for the promotional Trial — so the cards read as part
 // of the same Aesop-muted palette as everywhere else, not a bolted-on
 // pricing-page look.
 const PLAN_COLOR = {
+  trial: CATEGORY_COLORS.Seating.pastel,
   pass: CATEGORY_COLORS.Boxes.pastel,
   annual: CATEGORY_COLORS.Storage.pastel,
 } as const;
+
+// One flag, flipped off (and this whole card block deleted) once the
+// promotion's done its job — everything else in this file is written so
+// removing it later is a one-line change, not a re-layout.
+const TRIAL_OFFER_ENABLED = true;
 
 export function PaywallSheet() {
   const isOpen = usePaywallStore((s) => s.isOpen);
   const close = usePaywallStore((s) => s.close);
   const posthog = usePostHog();
-  const [loadingProduct, setLoadingProduct] = useState<"pass" | "annual" | null>(null);
+  const [loadingProduct, setLoadingProduct] = useState<"trial" | "pass" | "annual" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  async function handleUpgrade(product: "pass" | "annual") {
+  async function handleUpgrade(product: "trial" | "pass" | "annual") {
     setLoadingProduct(product);
     setError(null);
     posthog?.capture("checkout_started", { product });
@@ -52,6 +59,30 @@ export function PaywallSheet() {
           Rooms, floor plans, and placing your things in space are part of Hizzel. Your
           Things stay free forever — unlock Hizzel with one of these:
         </p>
+        {TRIAL_OFFER_ENABLED && (
+          <button
+            type="button"
+            onClick={() => handleUpgrade("trial")}
+            disabled={!!loadingProduct}
+            className="mb-2 flex w-full items-center justify-between gap-3 rounded-[11px] px-3.5 py-3 text-left transition-opacity disabled:opacity-60 active:opacity-80"
+            style={{ backgroundColor: PLAN_COLOR.trial }}
+          >
+            <div>
+              <div className="flex items-center gap-2.5">
+                <span className="text-sm font-medium text-linen-ink">
+                  {loadingProduct === "trial" ? "Redirecting…" : "7-Day Free Trial"}
+                </span>
+                <span className="inline-flex items-center rounded-full bg-[var(--color-amber-1)] px-2 py-0.5 text-[9px] font-semibold tracking-[0.06em] text-amber-ink uppercase">
+                  Promotional offer
+                </span>
+              </div>
+              <div className="mt-0.5 text-xs text-linen-ink-secondary">
+                Try Hizzel in full for a week, no payment needed. One trial per account.
+              </div>
+            </div>
+            <IconChevronRight size={16} className="shrink-0 text-linen-ink/40" />
+          </button>
+        )}
         <button
           type="button"
           onClick={() => handleUpgrade("pass")}

@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getPostHogServerClient } from "@/lib/posthog-server";
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 // profiles.hizzel_unlocked_until / hizzel_product aren't in the generated
 // Database type yet — same cast pattern as every other hook/route in this
@@ -19,8 +20,9 @@ interface ProfilesBillingTable {
       stripe_customer_id?: string | null;
       stripe_subscription_id?: string | null;
       hizzel_unlocked_until?: string;
-      hizzel_product?: "pass" | "annual";
+      hizzel_product?: "trial" | "pass" | "annual";
       hizzel_cancel_at_period_end?: boolean;
+      trial_used?: boolean;
     }): {
       eq(col: "id" | "stripe_customer_id", val: string): Promise<{ error: { message: string } | null }>;
     };
@@ -95,6 +97,7 @@ export async function POST(request: Request) {
       if (!userId) break;
 
       const product = (session.metadata?.product ?? (session.mode === "payment" ? "pass" : "annual")) as
+        | "trial"
         | "pass"
         | "annual";
       const stripeCustomerId = customerId(session.customer);
@@ -102,7 +105,12 @@ export async function POST(request: Request) {
       let unlockedUntil: string;
       let subscriptionId: string | null = null;
       if (session.mode === "payment") {
-        unlockedUntil = new Date(Date.now() + NINETY_DAYS_MS).toISOString();
+        // The Trial is a real, separate product (not a discounted Pass) —
+        // see the trial_product migration's own comment for why that's
+        // more robust than inferring "was this a trial" from the amount
+        // paid. Everything else about it (one-time, customer_creation,
+        // etc.) matches the Pass exactly; only the unlock length differs.
+        unlockedUntil = new Date(Date.now() + (product === "trial" ? SEVEN_DAYS_MS : NINETY_DAYS_MS)).toISOString();
       } else {
         subscriptionId =
           typeof session.subscription === "string" ? session.subscription : (session.subscription?.id ?? null);
@@ -148,6 +156,10 @@ export async function POST(request: Request) {
         // scheduled cancellation — most relevant for someone who cancelled
         // Annual, changed their mind, and bought again before it lapsed.
         hizzel_cancel_at_period_end: false,
+        // Only ever set true, never reset — this is the one-trial-per-
+        // account guard checkout/route.ts checks, and it must survive a
+        // later real Pass/Annual purchase overwriting hizzel_product.
+        ...(product === "trial" ? { trial_used: true } : {}),
       }).eq("id", userId);
 
       posthog.capture({
