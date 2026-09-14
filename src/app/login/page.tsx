@@ -66,7 +66,14 @@ export default function LoginPage() {
       return;
     }
     if (data.user) posthog?.identify(data.user.id, { email: data.user.email });
-    router.push("/welcome");
+    // Not /welcome directly — middleware.ts already redirects any
+    // un-onboarded user visiting anything outside /welcome straight there,
+    // and lets an already-onboarded user through everywhere else. Routing
+    // here unconditionally to /welcome bypassed that check entirely,
+    // showing every returning (already-onboarded) login the Welcome
+    // screen and "Watch demo" option again, forever — not just the once,
+    // before they first pressed "Let's begin".
+    router.push("/");
   }
 
   return (
