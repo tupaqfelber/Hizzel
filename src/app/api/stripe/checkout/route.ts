@@ -70,6 +70,10 @@ export async function POST(request: Request) {
       line_items: [{ price: priceId, quantity: 1 }],
       client_reference_id: user.id,
       metadata: { product },
+      // Off by default — without this, Checkout never shows a "have a
+      // promo code?" field at all, so a coupon created in Stripe would
+      // have nowhere for a customer to actually enter it.
+      allow_promotion_codes: true,
       ...(product === "annual"
         ? { subscription_data: { metadata: { supabase_user_id: user.id } } }
         : {}),
