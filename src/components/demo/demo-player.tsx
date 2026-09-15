@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/client";
+import { trackSignUpConversion } from "@/lib/gtag";
 import { useDemoStore } from "@/hooks/use-demo-store";
 import { runDemoScript } from "@/lib/demo/demo-script";
 import { DemoPlanIcon } from "@/components/demo/demo-plan-icon";
@@ -89,6 +90,10 @@ export function DemoPlayer() {
     if (user) {
       await supabase.from("profiles").update({ onboarded: true }).eq("id", user.id);
     }
+    // Google Ads "Sign Up" conversion (Performance Max campaign) — this
+    // is the demo's own equivalent of welcome/page.tsx's handleContinue,
+    // same reasoning, see src/lib/gtag.ts.
+    trackSignUpConversion();
     useDemoStore.getState().finish();
     window.location.href = "/";
   }, [beginning]);

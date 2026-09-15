@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { DESKTOP_BREAKPOINT_PX } from "@/components/app-shell";
+import { trackSignUpConversion } from "@/lib/gtag";
 
 export default function WelcomePage() {
   const router = useRouter();
@@ -44,6 +45,9 @@ export default function WelcomePage() {
     if (user) {
       await supabase.from("profiles").update({ onboarded: true }).eq("id", user.id);
     }
+    // Google Ads "Sign Up" conversion (Performance Max campaign) — see
+    // src/lib/gtag.ts for the full reasoning.
+    trackSignUpConversion();
     router.push("/");
   }
 
