@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Serif_Display, Playfair_Display, DM_Sans } from "next/font/google";
+import Script from "next/script";
 import { AppProviders } from "@/components/providers/app-providers";
 import "./globals.css";
 
@@ -75,6 +76,22 @@ export default function RootLayout({
       className={`${dmSerifDisplay.variable} ${playfairDisplay.variable} ${dmSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">
+        {/* Google Ads conversion tracking (Performance Max campaign) —
+            afterInteractive loads it once the page is interactive rather
+            than blocking the initial render, Next's recommended strategy
+            for analytics/ads tags that don't need to run before paint. */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=AW-18451639556"
+          strategy="afterInteractive"
+        />
+        <Script id="google-ads-tag" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'AW-18451639556');
+          `}
+        </Script>
         <AppProviders>{children}</AppProviders>
       </body>
     </html>
